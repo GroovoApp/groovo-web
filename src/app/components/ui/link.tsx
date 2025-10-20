@@ -1,25 +1,27 @@
-import React from "react"
+"use client";
+import React, { ReactNode } from "react";
+import Link, { LinkProps } from "next/link";
 
-interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
-  underlined?: boolean
+interface CustomLinkProps extends LinkProps {
+  underlined?: boolean;
+  className?: string;
+  children: ReactNode;
 }
 
-export default function Link({
+export default function CustomLink({
   children,
-  href,
   underlined = false,
   className = "",
   ...props
-}: LinkProps) {
+}: CustomLinkProps) {
   return (
-    <a
-      href={href}
-      className={`text-blue-600 hover:text-blue-700 transition-colors
-        ${underlined ? "underline" : "no-underline"}
-        ${className}`}
+    <Link
       {...props}
+      className={`text-blue-600 hover:text-blue-700 transition-colors ${
+        underlined ? "underline" : "no-underline"
+      } ${className}`}
     >
       {children}
-    </a>
-  )
+    </Link>
+  );
 }
