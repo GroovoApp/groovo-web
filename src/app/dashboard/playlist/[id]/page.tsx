@@ -4,12 +4,13 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import TableSongElement from "@/src/app/components/ui/tableSongElement";
 import { useParams } from "next/navigation";
+import { fetchWithAuth } from "@/src/app/utils/api";
 
 type Song = {
   id: string;
   title: string;
   album: string;
-  image?: string;
+  image: string;
   author: string;
   dateAdded: string;
   duration: string;
@@ -35,7 +36,7 @@ export default function PlaylistPage() {
   useEffect(() => {
     async function fetchPlaylist() {
       try {
-        const res = await fetch(`http://localhost:8080/api/v1/Playlists/${id}`);
+        const res = await fetchWithAuth(`http://localhost:5039/api/v1/Playlists/${id}`);
         if (!res.ok) throw new Error(`Failed to fetch playlist: ${res.status}`);
         const json = await res.json();
 
@@ -59,7 +60,7 @@ export default function PlaylistPage() {
             image: s.picture || "https://picsum.photos/seed/default-image/200/200",
             author: s.authorNames?.join(", ") || "Unknown",
             dateAdded: new Date(s.releaseDate).toLocaleDateString(),
-            duration: `${Math.floor(s.length / 60)}:${String(s.length % 60).padStart(2, "0")}`,
+            duration: s.duration,
           })),
         };
 

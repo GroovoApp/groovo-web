@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from "react";
 import SavedEntry from "@/src/app/components/ui/savedEntry";
+import { fetchWithAuth } from "@/src/app/utils/api";
 
 // The entry shape your UI uses
 interface Entry {
@@ -18,13 +19,13 @@ export default function LeftSideNav() {
   useEffect(() => {
     async function fetchPlaylists() {
       try {
-        const res = await fetch("http://localhost:8080/api/v1/Playlists", {
+        const res = await fetchWithAuth("http://localhost:5039/api/v1/Playlists", {
           method: "GET",
         });
 
         if (!res.ok) throw new Error(`Failed to fetch playlists: ${res.status}`);
         const json = await res.json();
-        
+
         const formattedEntries: Entry[] = json.data.map((p: any) => ({
           id: p.id,
           name: p.name,
