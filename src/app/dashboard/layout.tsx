@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import TopNav from "@/src/app/components/sections/topNav";
 import LeftSideNav from "@/src/app/components/sections/leftSideNav";
 import RightSideNav from "@/src/app/components/sections/rightSideNav";
-import { Song } from "@/src/app/types/song"; // import your Song type
+import { Song } from "@/src/app/types/song";
+import { useAuthGuard } from "@/src/app/utils/auth";
 
 export const CurrentSongContext = React.createContext<{
   currentSong: Song | null;
@@ -15,6 +16,8 @@ export const CurrentSongContext = React.createContext<{
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
+
+  useAuthGuard()
 
   return (
     <CurrentSongContext.Provider value={{ currentSong, setCurrentSong }}>
