@@ -1,7 +1,9 @@
 'use client';
 import React, { useEffect, useState } from "react";
 import SavedEntry from "@/src/app/components/ui/savedEntry";
+import Link from "next/link";
 import { fetchWithAuth } from "@/src/app/utils/api";
+import { isUserType } from "@/src/app/utils/auth";
 
 // The entry shape your UI uses
 interface Entry {
@@ -15,11 +17,15 @@ export default function LeftSideNav() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isArtist, setIsArtist] = useState(false);
 
   useEffect(() => {
+    // Check if user is an artist
+    setIsArtist(isUserType("artist"));
+
     async function fetchPlaylists() {
       try {
-        const res = await fetchWithAuth("http://localhost:5039/api/v1/Playlists", {
+        const res = await fetchWithAuth("http://localhost:8080/api/v1/Playlists", {
           method: "GET",
         });
 
@@ -48,13 +54,25 @@ export default function LeftSideNav() {
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
 
   return (
-    <div className="h-full w-[300px] flex flex-col gap-2 bg-neutral-900 rounded-lg p-4 pt-4">
+    <div className="h-full w-[300px] flex flex-col gap-2 bg-neutral-900 rounded-lg p-4 pt-4 relative">
       <h1 className="text-md font-semibold">Your library</h1>
       <div className="flex flex-col gap-2">
         {entries.map((entry) => (
           <SavedEntry key={entry.id} entry={entry} />
         ))}
       </div>
+
+      {/* Floating upload CTA — only visible for artists */}
+      {isArtist && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+          <Link
+            href="/dashboard/upload"
+            className="inline-flex items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm shadow-lg ring-1 ring-black/10"
+          >
+            Upload song
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

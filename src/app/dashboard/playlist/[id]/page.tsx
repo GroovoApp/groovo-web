@@ -36,7 +36,7 @@ export default function PlaylistPage() {
   useEffect(() => {
     async function fetchPlaylist() {
       try {
-        const res = await fetchWithAuth(`http://localhost:5039/api/v1/Playlists/${id}`);
+        const res = await fetchWithAuth(`http://localhost:8080/api/v1/Playlists/${id}`);
         if (!res.ok) throw new Error(`Failed to fetch playlist: ${res.status}`);
         const json = await res.json();
 

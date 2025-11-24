@@ -17,7 +17,7 @@ export default function RightSideNav({ currentSong }: RightSideNavProps) {
       if (!currentSong?.id) return;
 
       try {
-        const res = await fetchWithAuth(`http://localhost:5039/api/v1/Songs/${currentSong.id}`);
+        const res = await fetchWithAuth(`http://localhost:8080/api/v1/Songs/${currentSong.id}`);
         console.log(res);
         if (!res.ok) throw new Error(`Failed to fetch song: ${res.status}`);
         const json = await res.json();
