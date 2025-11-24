@@ -3,8 +3,9 @@
 import Button from '@/src/app/components/ui/button'
 import Input from '@/src/app/components/ui/input'
 import Link from '@/src/app/components/ui/link'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { isAuthValid } from '@/src/app/utils/auth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -12,6 +13,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isAuthValid()) {
+      router.push('/dashboard')
+    }
+  }, [router])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -46,7 +53,7 @@ export default function LoginPage() {
         console.warn('No accessToken returned from login endpoint', responseData);
       }
 
-      //router.push('/dashboard');
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {
