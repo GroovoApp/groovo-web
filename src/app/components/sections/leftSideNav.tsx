@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import SavedEntry from "@/src/app/components/ui/savedEntry";
 import Link from "next/link";
-import { fetchSongsByAuthor, fetchPlaylistsByUser } from "@/src/app/utils/api";
+import { fetchPlaylistsByAuthor, fetchPlaylistsByUser } from "@/src/app/utils/api";
 import { useUserType, useUserId } from "@/src/app/utils/auth";
 
 // The entry shape your UI uses
@@ -32,16 +32,19 @@ export default function LeftSideNav() {
         setError(null);
 
         if (userType.toLowerCase() === "author") {
-          // Fetch songs for authors
-          const data = await fetchSongsByAuthor(userId);
-          const songs = data?.data || data || [];
+          // Fetch playlists/albums for authors
+          const data = await fetchPlaylistsByAuthor(userId);
+          console.log(data);
+          const playlists = data?.data || data || [];
           
-          const formattedEntries: Entry[] = songs.map((song: any) => ({
-            id: song.id,
-            name: song.title || song.name || "Untitled",
-            image: song.coverArt || "http://localhost:5039/" + song.picture || "https://picsum.photos/seed/" + song.id + "/40/40",
-            author: song.genre || "Song",
+          const formattedEntries: Entry[] = playlists.map((playlist: any) => ({
+            id: playlist.id,
+            name: playlist.name || "Untitled Album",
+            image: playlist.picture || "https://picsum.photos/seed/" + playlist.id + "/40/40",
+            author: "you",
           }));
+
+          console.log("Fetched playlists for author:", formattedEntries);
 
           setEntries(formattedEntries);
         } else {

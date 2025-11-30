@@ -19,7 +19,7 @@ export default function SavedEntry({ entry }: { entry: Entry }) {
         width={40}
         height={40}
         priority
-        className="rounded-md invert border-2 aspect-square flex-none max-h-[40px] max-w-[40px]"
+        className="rounded-md border-2 aspect-square flex-none max-h-[40px] max-w-[40px]"
       />
       <div className="flex flex-col">
         <h3 className="text-sm font-medium text-white">{entry.name}</h3>

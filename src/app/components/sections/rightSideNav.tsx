@@ -52,6 +52,7 @@ export default function RightSideNav({ currentSong }: RightSideNavProps) {
       <span className="text-sm text-gray-400">{currentSong.author}</span>
       <span className="text-sm text-gray-400">{currentSong.album}</span>
       <span className="text-sm text-gray-400">{currentSong.duration}</span>
+      <span className="text-sm text-gray-400">id: {currentSong.id}</span>
     </div>
   );
 }

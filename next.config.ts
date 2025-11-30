@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
         hostname: 'picsum.photos',
       },
       {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+      },
+      {
         protocol: 'http',
         hostname: 'localhost',
         port: '5039',
