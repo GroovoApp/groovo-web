@@ -2,8 +2,8 @@
 import React, { useEffect, useState } from "react";
 import SavedEntry from "@/src/app/components/ui/savedEntry";
 import Link from "next/link";
-import { fetchWithAuth } from "@/src/app/utils/api";
-import { isUserType } from "@/src/app/utils/auth";
+import { fetchSongsByAuthor, fetchPlaylistsByUser } from "@/src/app/utils/api";
+import { useUserType, useUserId } from "@/src/app/utils/auth";
 
 // The entry shape your UI uses
 interface Entry {
@@ -17,29 +17,47 @@ export default function LeftSideNav() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isArtist, setIsArtist] = useState(false);
+  const userType = useUserType();
+  const userId = useUserId();
 
   useEffect(() => {
-    // Check if user is an artist
-    setIsArtist(isUserType("artist"));
+    async function fetchData() {
+      if (!userId || !userType) {
+        setLoading(false);
+        return;
+      }
 
-    async function fetchPlaylists() {
       try {
-        const res = await fetchWithAuth("http://localhost:8080/api/v1/Playlists", {
-          method: "GET",
-        });
+        setLoading(true);
+        setError(null);
 
-        if (!res.ok) throw new Error(`Failed to fetch playlists: ${res.status}`);
-        const json = await res.json();
+        if (userType.toLowerCase() === "author") {
+          // Fetch songs for authors
+          const data = await fetchSongsByAuthor(userId);
+          const songs = data?.data || data || [];
+          
+          const formattedEntries: Entry[] = songs.map((song: any) => ({
+            id: song.id,
+            name: song.title || song.name || "Untitled",
+            image: song.coverArt || "http://localhost:5039/" + song.picture || "https://picsum.photos/seed/" + song.id + "/40/40",
+            author: song.genre || "Song",
+          }));
 
-        const formattedEntries: Entry[] = json.data.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          image: p.picture || "https://picsum.photos/seed/" + p.id + "/40/40", // fallback image
-          author: p.description || "Unknown Author",
-        }));
+          setEntries(formattedEntries);
+        } else {
+          // Fetch playlists for users/listeners
+          const data = await fetchPlaylistsByUser(userId);
+          const playlists = data?.data || data || [];
 
-        setEntries(formattedEntries);
+          const formattedEntries: Entry[] = playlists.map((p: any) => ({
+            id: p.id,
+            name: p.name || p.title || "Untitled Playlist",
+            image: p.picture || p.coverArt || "https://picsum.photos/seed/" + p.id + "/40/40",
+            author: p.description || "Playlist",
+          }));
+
+          setEntries(formattedEntries);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -47,8 +65,8 @@ export default function LeftSideNav() {
       }
     }
 
-    fetchPlaylists();
-  }, []);
+    fetchData();
+  }, [userId, userType]);
 
   if (loading) return <div className="p-4 text-gray-400">Loading your library...</div>;
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
@@ -63,7 +81,7 @@ export default function LeftSideNav() {
       </div>
 
       {/* Floating upload CTA — only visible for artists */}
-      {isArtist && (
+      {(userType?.toLowerCase() === "author" || userType?.toLowerCase() === "artist") && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
           <Link
             href="/dashboard/upload"

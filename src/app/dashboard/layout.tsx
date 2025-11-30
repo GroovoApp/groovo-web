@@ -4,7 +4,7 @@ import TopNav from "@/src/app/components/sections/topNav";
 import LeftSideNav from "@/src/app/components/sections/leftSideNav";
 import RightSideNav from "@/src/app/components/sections/rightSideNav";
 import { Song } from "@/src/app/types/song";
-import { useAuthGuard } from "@/src/app/utils/auth";
+import { useAuthGuard, useUserType } from "@/src/app/utils/auth";
 
 export const CurrentSongContext = React.createContext<{
   currentSong: Song | null;
@@ -16,6 +16,7 @@ export const CurrentSongContext = React.createContext<{
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
+  const userType = useUserType();
 
   useAuthGuard()
 
@@ -32,9 +33,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {children}
           </div>
 
-          <div className="flex-shrink-0 h-full">
-            <RightSideNav currentSong={currentSong} />
-          </div>
+          {userType?.toLowerCase() !== "author" && (
+            <div className="flex-shrink-0 h-full">
+              <RightSideNav currentSong={currentSong} />
+            </div>
+          )}
         </div>
       </div>
     </CurrentSongContext.Provider>

@@ -43,3 +43,53 @@ export async function createSong(payload: any) {
 
   return res.json().catch(() => null);
 }
+
+export async function fetchSongsByAuthor(authorId: string) {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/users/Authors/${authorId}/songs`;
+  console.log("Fetching songs for author:", url, authorId);
+
+  const res = await fetchWithAuth(url, {
+    method: 'GET',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    throw new Error(`Fetch songs failed: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  return res.json().catch(() => []);
+}
+
+export async function fetchPlaylistsByUser(userId: string) {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/Playlists`;
+
+  const res = await fetchWithAuth(url, {
+    method: 'GET',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    throw new Error(`Fetch playlists failed: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  return res.json().catch(() => []);
+}
+
+export async function createPlaylist(payload: any) {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/Playlists`;
+
+  const res = await fetchWithAuth(url, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    throw new Error(`Create playlist failed: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  return res.json().catch(() => null);
+}

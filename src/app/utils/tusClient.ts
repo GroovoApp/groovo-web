@@ -29,7 +29,7 @@ export function startTusUpload(file: File, opts?: {
   retryDelays?: number[];
   onProgress?: (bytesUploaded: number, bytesTotal: number) => void;
 }) {
-  const endpoint = opts?.endpoint || process.env.NEXT_PUBLIC_TUS_ENDPOINT || "http://localhost:8080/files/";
+  const endpoint = "http://localhost:8080/files";
 
   // Get auth token from localStorage
   let authHeaders: Record<string, string> = {};

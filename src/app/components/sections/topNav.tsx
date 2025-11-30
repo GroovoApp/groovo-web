@@ -2,11 +2,12 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useUserType } from "@/src/app/utils/auth";
+import { useUserType, useUserName } from "@/src/app/utils/auth";
 
 export default function TopNav() {
   const [open, setOpen] = useState(false);
   const userType = useUserType();
+  const userName = useUserName();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
 
@@ -79,7 +80,7 @@ export default function TopNav() {
             </div>
 
             <span className="hidden sm:inline-block text-sm">
-              Account {userType && `(${userType})`}
+              {userName || "Account"} {userType && `(${userType})`}
             </span>
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -2,39 +2,156 @@
 import React, { useState, useRef, useEffect } from "react";
 import Button from "@/src/app/components/ui/button";
 import { useRouter } from "next/navigation";
-import { createSong } from "@/src/app/utils/api";
+import { createSong, fetchPlaylistsByUser, createPlaylist } from "@/src/app/utils/api";
 import { startTusUpload } from "@/src/app/utils/tusClient";
-import { isUserType } from "@/src/app/utils/auth";
+import { useUserType, useUserId } from "@/src/app/utils/auth";
 
 export default function UploadPage() {
   const router = useRouter();
+  const userType = useUserType();
+  const userId = useUserId();
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
+  const [authorIds, setAuthorIds] = useState("");
   const [genre, setGenre] = useState("");
+  const [album, setAlbum] = useState("");
+  const [description, setDescription] = useState("");
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [audioName, setAudioName] = useState<string | null>(null);
   const [audioProgress, setAudioProgress] = useState<number | null>(null);
   const [imageProgress, setImageProgress] = useState<number | null>(null);
   const audioUploadRef = useRef<any | null>(null);
   const imageUploadRef = useRef<any | null>(null);
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Album/Playlist states
+  const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
+  const [showCreateAlbum, setShowCreateAlbum] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState("");
+  const [newAlbumDescription, setNewAlbumDescription] = useState("");
+  const [creatingAlbum, setCreatingAlbum] = useState(false);
+
   useEffect(() => {
     // Only allow artists to access this page
-    if (!isUserType("artist")) {
+    if (userType && userType.toLowerCase() !== "author") {
       router.push("/dashboard");
     }
-  }, [router]);
+  }, [userType, router]);
+
+  useEffect(() => {
+    // Set the current user's ID as the default author ID
+    if (userId) {
+      setAuthorIds(userId);
+    }
+  }, [userId]);
+
+  // Fetch user's playlists/albums
+  useEffect(() => {
+    async function loadPlaylists() {
+      if (!userId) return;
+      
+      try {
+        setLoadingPlaylists(true);
+        console.log('Fetching playlists/albums for userId:', userId);
+        const data = await fetchPlaylistsByUser(userId);
+        console.log('Raw API response:', data);
+        
+        const playlists = data?.data || data || [];
+        console.log('Parsed playlists/albums:', playlists);
+        
+        // For authors, filter to show only albums (isAlbum: true)
+        const filteredPlaylists = userType?.toLowerCase() === 'author' 
+          ? playlists.filter((p: any) => p.isAlbum === true)
+          : playlists;
+        
+        console.log('Filtered playlists/albums:', filteredPlaylists);
+        setUserPlaylists(filteredPlaylists);
+      } catch (err: any) {
+        console.error('Failed to fetch playlists:', err);
+      } finally {
+        setLoadingPlaylists(false);
+      }
+    }
+
+    loadPlaylists();
+  }, [userId, userType]);
+
+  // Show loading while checking user type
+  if (!userType) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-gray-400">Loading...</p>
+      </div>
+    );
+  }
 
   // If not an artist, show nothing while redirecting
-  if (!isUserType("artist")) {
+  if (userType.toLowerCase() !== "author") {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-gray-400">Access denied. Redirecting...</p>
       </div>
     );
+  }
+
+  async function handleCreateAlbum() {
+    if (!newAlbumName.trim()) {
+      setMessage("Please provide an album name.");
+      return;
+    }
+
+    if (!userId) {
+      setMessage("User ID not found.");
+      return;
+    }
+
+    try {
+      setCreatingAlbum(true);
+      setMessage("Creating album...");
+      
+      const albumPayload = {
+        name: newAlbumName.trim(),
+        description: newAlbumDescription.trim() || "",
+        picture: "", // Can be added later if needed
+        isPublic: true,
+        isAlbum: true, // Authors create albums
+        ownerIds: [userId], // Current user as owner
+      };
+      
+      console.log("Create album payload:", albumPayload);
+      
+      const newAlbum = await createPlaylist(albumPayload);
+      
+      // Set the newly created album as selected
+      const albumId = newAlbum?.id || newAlbum?.data?.id;
+      if (albumId) {
+        setSelectedAlbumId(albumId);
+        setAlbum(albumId);
+        
+        // Add to the list of playlists
+        const albumData = newAlbum?.data || newAlbum;
+        setUserPlaylists([...userPlaylists, albumData]);
+        
+        setMessage("Album created successfully!");
+      } else {
+        setMessage("Album created but ID not returned");
+      }
+      
+      setShowCreateAlbum(false);
+      setNewAlbumName("");
+      setNewAlbumDescription("");
+    } catch (err: any) {
+      console.error("Failed to create album:", err);
+      setMessage(`Failed to create album: ${err?.message || err}`);
+    } finally {
+      setCreatingAlbum(false);
+    }
   }
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -117,14 +234,24 @@ export default function UploadPage() {
 
         // attempt to create the song record on the API
         try {
+          // Parse author IDs from comma-separated string
+          const parsedAuthorIds = authorIds
+            .split(',')
+            .map(id => id.trim())
+            .filter(id => id.length > 0);
+
+          // Use selected album ID or the manual album input
+          const albumValue = selectedAlbumId || album.trim();
+          const albumGuid = albumValue ? albumValue : null;
+
           const body = {
             name: title.trim(),
-            description: "",
+            description: description.trim() || "",
             releaseDate: new Date().toISOString(),
-            authorIds: [],
-            album: null,
+            authorIds: parsedAuthorIds,
+            album: albumGuid,
             genre: genre.trim() || "",
-            tags: [],
+            tags: ["/"],
             audioId: audioId,
             imageId: imageId,
           };
@@ -230,33 +357,206 @@ export default function UploadPage() {
     <div className="p-6 max-w-3xl mx-auto">
       <h2 className="text-2xl font-semibold mb-4">Upload a song</h2>
 
-      <form className="space-y-4 bg-neutral-900 p-6 rounded" onSubmit={handleSubmit}>
+      {/* Album Selection Section */}
+      <div className="mb-6 bg-neutral-900 p-6 rounded">
+        <h3 className="text-lg font-semibold mb-3">Album Selection</h3>
+        
+        {loadingPlaylists ? (
+          <p className="text-gray-400">Loading your albums...</p>
+        ) : userPlaylists.length > 0 ? (
+          <>
+            <p className="text-sm text-gray-400 mb-3">Select an existing album or create a new one:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+              {userPlaylists.map((playlist) => (
+                <Button
+                  key={playlist.id}
+                  type="button"
+                  variant={selectedAlbumId === playlist.id ? "default" : "outline"}
+                  onClick={() => setSelectedAlbumId(selectedAlbumId === playlist.id ? null : playlist.id)}
+                  className="p-3 h-auto text-left flex flex-col items-start"
+                >
+                  <div className="font-medium text-sm truncate w-full">{playlist.name || playlist.title}</div>
+                  {playlist.description && (
+                    <div className="text-xs text-gray-400 truncate mt-1 w-full">{playlist.description}</div>
+                  )}
+                </Button>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCreateAlbum(!showCreateAlbum)}
+            >
+              {showCreateAlbum ? 'Cancel' : 'Create New Album'}
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-400 mb-3">You don't have any albums yet. Create one to organize your songs!</p>
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => setShowCreateAlbum(!showCreateAlbum)}
+            >
+              {showCreateAlbum ? 'Cancel' : 'Create Album'}
+            </Button>
+          </>
+        )}
+
+        {/* Create Album Form */}
+        {showCreateAlbum && (
+          <div className="mt-4 p-4 border border-neutral-700 rounded bg-neutral-800">
+            <h4 className="font-semibold mb-3">Create New Album</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Album Name *</label>
+                <input
+                  type="text"
+                  value={newAlbumName}
+                  onChange={(e) => setNewAlbumName(e.target.value)}
+                  className="w-full rounded-md p-2 bg-neutral-900 border border-neutral-700"
+                  placeholder="My New Album"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Album Description</label>
+                <textarea
+                  value={newAlbumDescription}
+                  onChange={(e) => setNewAlbumDescription(e.target.value)}
+                  className="w-full rounded-md p-2 bg-neutral-900 border border-neutral-700"
+                  rows={2}
+                  placeholder="Optional description"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="default"
+                onClick={handleCreateAlbum}
+                disabled={creatingAlbum}
+              >
+                {creatingAlbum ? 'Creating...' : 'Create Album'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {selectedAlbumId && (
+          <p className="text-sm text-green-400 mt-3">
+            Album selected: {userPlaylists.find(p => p.id === selectedAlbumId)?.name || "New Album"}
+          </p>
+        )}
+      </div>
+
+      {/* Only show song upload form if an album is selected */}
+      {!selectedAlbumId ? (
+        <div className="bg-neutral-900 p-6 rounded text-center">
+          <p className="text-gray-400">Please select or create an album before uploading a song.</p>
+        </div>
+      ) : (
+        <form className="space-y-4 bg-neutral-900 p-6 rounded" onSubmit={handleSubmit}>
         <div>
-          <label className="block text-sm text-gray-300">Title</label>
-          <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" />
+          <label className="block text-sm text-gray-300">Title *</label>
+          <input 
+            name="title" 
+            value={title} 
+            onChange={(e) => setTitle(e.target.value)} 
+            className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" 
+            required 
+          />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-300">Artist</label>
-          <input name="artist" value={artist} onChange={(e) => setArtist(e.target.value)} className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" />
+          <label className="block text-sm text-gray-300">Description</label>
+          <textarea 
+            name="description" 
+            value={description} 
+            onChange={(e) => setDescription(e.target.value)} 
+            className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" 
+            rows={3}
+            placeholder="Optional"
+          />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-300">Genre</label>
-          <input name="genre" value={genre} onChange={(e) => setGenre(e.target.value)} className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" />
+          <label className="block text-sm text-gray-300">Artist *</label>
+          <input 
+            name="artist" 
+            value={artist} 
+            onChange={(e) => setArtist(e.target.value)} 
+            className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" 
+            required 
+          />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-300">Cover image</label>
-          <input name="cover" onChange={(e) => { handleCoverChange(e); }} type="file" accept="image/*" className="mt-1 text-sm text-gray-300" />
+          <label className="block text-sm text-gray-300">Author IDs (comma-separated) *</label>
+          <input 
+            name="authorIds" 
+            value={authorIds} 
+            onChange={(e) => setAuthorIds(e.target.value)} 
+            className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" 
+            placeholder="e.g., id1, id2, id3"
+            required
+          />
+          <p className="mt-1 text-xs text-gray-400">Your ID is pre-filled. You can add more IDs separated by commas.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm text-gray-300">Genre *</label>
+          <input 
+            name="genre" 
+            value={genre} 
+            onChange={(e) => setGenre(e.target.value)} 
+            className="mt-1 w-full rounded-md p-2 bg-neutral-800 border border-neutral-700" 
+            required 
+          />
+        </div>
+
+        {/* Hidden input for album GUID - auto-filled from selection */}
+        <input type="hidden" name="album" value={selectedAlbumId || album} />
+
+        <div>
+          <label className="block text-sm text-gray-300 mb-2">Cover image *</label>
+          <input 
+            ref={coverFileInputRef}
+            name="cover" 
+            onChange={(e) => { handleCoverChange(e); }} 
+            type="file" 
+            accept="image/*" 
+            className="hidden"
+            required 
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => coverFileInputRef.current?.click()}
+          >
+            Choose Cover Image
+          </Button>
           {coverPreview && (
             <img src={coverPreview} alt="cover" className="mt-2 h-28 w-28 object-cover rounded" />
           )}
         </div>
 
         <div>
-          <label className="block text-sm text-gray-300">Audio file</label>
-          <input name="audio" onChange={handleAudioChange} type="file" accept="audio/*" className="mt-1 text-sm text-gray-300" />
+          <label className="block text-sm text-gray-300 mb-2">Audio file *</label>
+          <input 
+            ref={audioFileInputRef}
+            name="audio" 
+            onChange={handleAudioChange} 
+            type="file" 
+            accept="audio/*" 
+            className="hidden"
+            required 
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => audioFileInputRef.current?.click()}
+          >
+            Choose Audio File
+          </Button>
           {audioName && <div className="mt-2 text-sm text-gray-300">Selected: {audioName}</div>}
         </div>
 
@@ -265,20 +565,11 @@ export default function UploadPage() {
             {submitting ? "Uploading..." : "Upload"}
           </Button>
 
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            Back
-          </Button>
-
-          {/* Show pause/resume and cancel-upload while there's an active upload */}
+          {/* Show cancel-upload while there's an active upload */}
           {(audioUploadRef.current || imageUploadRef.current || submitting) && (
-            <>
-              <Button type="button" variant="outline" onClick={handlePauseResume}>
-                {isPaused ? "Resume" : "Pause"}
-              </Button>
-              <Button type="button" variant="destructive" onClick={handleCancelUpload}>
-                Cancel Upload
-              </Button>
-            </>
+            <Button type="button" variant="destructive" onClick={handleCancelUpload}>
+              Cancel Upload
+            </Button>
           )}
         </div>
 
@@ -306,6 +597,7 @@ export default function UploadPage() {
 
         {message && <div className="text-sm text-gray-300">{message}</div>}
       </form>
+      )}
     </div>
   );
 }
