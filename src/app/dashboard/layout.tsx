@@ -17,8 +17,15 @@ export const CurrentSongContext = React.createContext<{
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const userType = useUserType();
+  const isCheckingAuth = useAuthGuard();
 
-  useAuthGuard()
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-black">
+        <p className="text-gray-400">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <CurrentSongContext.Provider value={{ currentSong, setCurrentSong }}>

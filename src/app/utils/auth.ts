@@ -123,10 +123,15 @@ export function useUserId() {
 
 export function useAuthGuard() {
   const router = useRouter()
+  const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
     if (!isAuthValid()) {
       router.push("/auth/login")
+    } else {
+      setIsChecking(false)
     }
-  }, [])
+  }, [router])
+
+  return isChecking
 }
