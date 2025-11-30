@@ -5,6 +5,7 @@ import Image from "next/image";
 import TableSongElement from "@/src/app/components/ui/tableSongElement";
 import { useParams } from "next/navigation";
 import { fetchWithAuth } from "@/src/app/utils/api";
+import { useSignalR } from "@/src/app/contexts/SignalRContext";
 
 type Song = {
   id: string;
@@ -28,6 +29,7 @@ type Playlist = {
 export default function PlaylistPage() {
   const params = useParams();
   const { id } = params;
+  const { joinPlaylist, leavePlaylist, getPlaybackState, isConnected } = useSignalR();
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,13 +53,13 @@ export default function PlaylistPage() {
           id: apiData.id,
           name: apiData.name,
           description: apiData.description,
-          image: apiData.picture || "https://picsum.photos/seed/default-image/200/200",
+          image: "https://picsum.photos/seed/" + apiData.id + "/200/200",
           creator: apiData.owners?.[0]?.name || "Unknown",
           songs: (apiData.songs || []).map((s: any) => ({
             id: s.id,
             title: s.name,
             album: "", // API does not provide album
-            image: s.picture || "https://picsum.photos/seed/default-image/200/200",
+            image: "http://localhost:5039/contents/images/" + s.id,
             author: s.authorNames?.join(", ") || "Unknown",
             dateAdded: new Date(s.releaseDate).toLocaleDateString(),
             duration: s.duration,
@@ -75,6 +77,28 @@ export default function PlaylistPage() {
 
     fetchPlaylist();
   }, [id]);
+
+  // Join playlist via SignalR when component mounts and connection is ready
+  useEffect(() => {
+    if (!id || !isConnected) return;
+
+    joinPlaylist(id as string)
+      .then(() => {
+        console.log('Successfully joined playlist:', id);
+        // Request current playback state after joining
+        return getPlaybackState();
+      })
+      .then(() => {
+        console.log('Requested playback state');
+      })
+      .catch((err) => console.error('Failed to join playlist or get state:', err));
+
+    return () => {
+      leavePlaylist()
+        .then(() => console.log('Successfully left playlist:', id))
+        .catch((err) => console.error('Failed to leave playlist:', err));
+    };
+  }, [id, isConnected, joinPlaylist, leavePlaylist, getPlaybackState]);
 
   if (loading) return <p className="p-8">Loading playlist...</p>;
   if (error) return <p className="p-8 text-red-500">{error}</p>;

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Button from "@/src/app/components/ui/button";
 import { useRouter } from "next/navigation";
-import { createSong, fetchPlaylistsByUser, createPlaylist } from "@/src/app/utils/api";
+import { createSong, createPlaylist, fetchPlaylistsByAuthor } from "@/src/app/utils/api";
 import { startTusUpload } from "@/src/app/utils/tusClient";
 import { useUserType, useUserId } from "@/src/app/utils/auth";
 
@@ -59,7 +59,7 @@ export default function UploadPage() {
       try {
         setLoadingPlaylists(true);
         console.log('Fetching playlists/albums for userId:', userId);
-        const data = await fetchPlaylistsByUser(userId);
+        const data = await fetchPlaylistsByAuthor(userId);
         console.log('Raw API response:', data);
         
         const playlists = data?.data || data || [];

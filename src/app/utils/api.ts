@@ -44,10 +44,10 @@ export async function createSong(payload: any) {
   return res.json().catch(() => null);
 }
 
-export async function fetchSongsByAuthor(authorId: string) {
+export async function fetchPlaylistsByAuthor(authorId: string) {
   const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
-  const url = `${base}/api/v1/users/Authors/${authorId}/songs`;
-  console.log("Fetching songs for author:", url, authorId);
+  const url = `${base}/api/v1/users/${authorId}/playlists`;
+  console.log("Fetching playlists for author:", url, authorId);
 
   const res = await fetchWithAuth(url, {
     method: 'GET',
@@ -55,7 +55,7 @@ export async function fetchSongsByAuthor(authorId: string) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => null);
-    throw new Error(`Fetch songs failed: ${res.status} ${res.statusText} ${text || ''}`);
+    throw new Error(`Fetch playlists failed: ${res.status} ${res.statusText} ${text || ''}`);
   }
 
   return res.json().catch(() => []);
