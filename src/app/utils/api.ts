@@ -77,9 +77,34 @@ export async function fetchPlaylistsByUser(userId: string) {
   return res.json().catch(() => []);
 }
 
+export async function fetchUserPlaylists(userId: string) {
+  const base = process.env.NEXT_PUBLIC_API_BASE;
+  const url = `${base}/api/v1/users/${userId}/playlists`;
+
+  console.log("Fetching user playlists from:", url);
+
+  const res = await fetchWithAuth(url, {
+    method: 'GET',
+  });
+
+  console.log("Response status:", res.status, res.statusText);
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    console.error("Error response:", text);
+    throw new Error(`Fetch user playlists failed: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  const data = await res.json().catch(() => []);
+  console.log("Playlists data received:", data);
+  return data;
+}
+
 export async function createPlaylist(payload: any) {
   const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
   const url = `${base}/api/v1/Playlists`;
+
+  console.log("Creating playlist with payload:", payload);
 
   const res = await fetchWithAuth(url, {
     method: 'POST',
@@ -88,8 +113,31 @@ export async function createPlaylist(payload: any) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => null);
+    console.error("Create playlist error:", text);
     throw new Error(`Create playlist failed: ${res.status} ${res.statusText} ${text || ''}`);
   }
 
-  return res.json().catch(() => null);
+  const data = await res.json().catch(() => null);
+  console.log("Playlist created:", data);
+  return data;
+}
+
+export async function addSongToPlaylist(playlistId: string, songId: string) {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/Playlists/${playlistId}/songs/${songId}`;
+
+  console.log("Adding song to playlist:", { playlistId, songId });
+
+  const res = await fetchWithAuth(url, {
+    method: 'POST',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    console.error("Add song to playlist error:", text);
+    throw new Error(`Add song to playlist failed: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  console.log("Song added to playlist successfully");
+  return res.ok;
 }

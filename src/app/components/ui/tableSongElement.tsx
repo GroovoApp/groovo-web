@@ -8,9 +8,10 @@ import { useSignalR } from "@/src/app/contexts/SignalRContext";
 type Props = {
   song: Song;
   index: number;
+  onContextMenu?: (e: React.MouseEvent, songId: string) => void;
 };
 
-export default function TableSongElement({ song, index }: Props) {
+export default function TableSongElement({ song, index, onContextMenu }: Props) {
   const { setCurrentSong } = useContext(CurrentSongContext);
   const { playSong, isConnected } = useSignalR();
 
@@ -27,10 +28,18 @@ export default function TableSongElement({ song, index }: Props) {
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onContextMenu) {
+      onContextMenu(e, song.id);
+    }
+  };
+
   return (
     <tr
       className="transition-background transition-200 hover:bg-neutral-700 rounded-lg cursor-pointer select-none"
       onDoubleClick={handlePlaySong}
+      onContextMenu={handleContextMenu}
     >
       <td className="py-2 text-sm">{index}</td>
       <td className="py-2 text-sm flex items-center gap-2">

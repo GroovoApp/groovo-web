@@ -3,8 +3,9 @@
 import React, { useContext, useEffect, useState } from "react";
 import Image from "next/image";
 import TableSongElement from "@/src/app/components/ui/tableSongElement";
+import SongContextMenu from "@/src/app/components/ui/songContextMenu";
 import { useParams } from "next/navigation";
-import { fetchWithAuth } from "@/src/app/utils/api";
+import { fetchWithAuth, addSongToPlaylist } from "@/src/app/utils/api";
 import { useSignalR } from "@/src/app/contexts/SignalRContext";
 import Button from "@/src/app/components/ui/button";
 import { PlayerContext } from "@/src/app/dashboard/layout";
@@ -37,6 +38,8 @@ export default function PlaylistPage() {
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; songId: string } | null>(null);
+  const [addedStatus, setAddedStatus] = useState<{ playlistId: string; success: boolean } | null>(null);
 
   const [hasJoinedPlaylist, setHasJoinedPlaylist] = useState(false);
 
@@ -67,6 +70,30 @@ export default function PlaylistPage() {
       
     } catch (err) {
       // Error handling can be added here if needed
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, songId: string) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, songId });
+  };
+
+  const handleAddToPlaylist = async (playlistId: string) => {
+    if (!contextMenu) return;
+    
+    try {
+      await addSongToPlaylist(playlistId, contextMenu.songId);
+      setAddedStatus({ playlistId, success: true });
+      console.log(`Successfully added song ${contextMenu.songId} to playlist ${playlistId}`);
+      
+      // Clear status after a delay
+      setTimeout(() => setAddedStatus(null), 3000);
+    } catch (error: any) {
+      setAddedStatus({ playlistId, success: false });
+      console.error("Failed to add song to playlist:", error);
+      
+      // Clear status after a delay
+      setTimeout(() => setAddedStatus(null), 3000);
     }
   };
 
@@ -183,13 +210,27 @@ export default function PlaylistPage() {
           </thead>
           <tbody>
             {playlist.songs.map((song, index) => (
-              <TableSongElement song={song} key={song.id} index={index + 1} />
+              <TableSongElement 
+                song={song} 
+                key={song.id} 
+                index={index + 1} 
+                onContextMenu={handleContextMenu}
+              />
             ))}
           </tbody>
         </table>
       ) : (
         <p className="text-gray-400">No songs in this playlist yet.</p>
       )}
+
+      <SongContextMenu
+        isOpen={contextMenu !== null}
+        position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : { x: 0, y: 0 }}
+        onClose={() => setContextMenu(null)}
+        songId={contextMenu?.songId || ""}
+        onAddToPlaylist={handleAddToPlaylist}
+        addedStatus={addedStatus}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Image from "next/image";
 import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useUserType, useUserName } from "@/src/app/utils/auth";
+import Link from "../ui/link";
 
 export default function TopNav() {
   const [open, setOpen] = useState(false);
@@ -42,13 +43,15 @@ export default function TopNav() {
       <div className="flex items-center justify-between w-full">
         {/* Left: logo */}
         <div className="flex items-center gap-3">
-          <Image
-            src="/Groovo.svg"
-            alt="Groovo Logo"
-            width={120}
-            height={32}
-            priority
-          />
+          <Link href="/dashboard">
+            <Image
+              src="/Groovo.svg"
+              alt="Groovo Logo"
+              width={120}
+              height={32}
+              priority
+            />
+          </Link>
         </div>
 
         {/* Center: search bar */}

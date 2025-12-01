@@ -1,42 +1,87 @@
 "use client";
 
-import UserTypeGuard from "@/src/app/components/ui/userTypeGuard";
-import { useUserType, useUserName } from "@/src/app/utils/auth";
+import { useEffect, useState } from "react";
+import PlaylistCard from "@/src/app/components/ui/playlistCard";
+import { fetchPlaylistsByUser } from "@/src/app/utils/api";
+import { useUserId } from "@/src/app/utils/auth";
+
+interface Playlist {
+  id: string;
+  name: string;
+  picture?: string;
+  description?: string;
+}
 
 export default function DashboardPage() {
-  const userType = useUserType();
-  const userName = useUserName();
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const userId = useUserId();
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const data = await fetchPlaylistsByUser(userId);
+        const playlistsData = data?.data || data || [];
+        setPlaylists(playlistsData);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-400 text-lg">Loading playlists...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-red-500 text-lg">Error: {error}</p>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <h2 className="text-3xl font-bold mb-4">Dashboard</h2>
-      <p className="mb-4">Welcome{userName ? ` back, ${userName}` : " to your dashboard"}! Here you can manage your music and playlists.</p>
+    <div className="px-6 py-8">
+      <h2 className="text-2xl font-bold mb-6">Public Playlists</h2>
       
-      {userType && (
-        <div className="mb-6 p-4 bg-neutral-800 rounded-lg">
-          <p className="text-sm text-gray-400">Logged in as: <span className="text-white font-semibold">{userName || "User"}</span> ({userType})</p>
+      {playlists.length === 0 ? (
+        <div className="flex items-center justify-center h-64">
+          <p className="text-gray-400 text-lg">No playlists available</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {playlists.map((playlist) => (
+            <PlaylistCard
+              key={playlist.id}
+              id={playlist.id}
+              name={playlist.name || "Untitled Playlist"}
+              image={
+                playlist.picture ||
+                `https://api.dicebear.com/9.x/shapes/svg?backgroundType=gradientLinear&backgroundColor=2e1010,bb2169&shape1Color=bb2169,f48323&shape2Color=6a1cbb,f41d1c&shape3Color=18bb29,164ef4&seed=${playlist.id}`
+              }
+              description={playlist.description}
+            />
+          ))}
         </div>
       )}
-
-      <UserTypeGuard allowedTypes={["artist", "author"]}>
-        <div className="mt-6 p-6 bg-blue-900/20 border border-blue-700 rounded-lg">
-          <h3 className="text-xl font-semibold mb-2">Artist Features</h3>
-          <p className="text-gray-300 mb-4">As an artist, you can upload and manage your music.</p>
-          <a 
-            href="/dashboard/upload" 
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-          >
-            Upload New Song
-          </a>
-        </div>
-      </UserTypeGuard>
-
-      <UserTypeGuard allowedTypes={["listener", "user"]}>
-        <div className="mt-6 p-6 bg-green-900/20 border border-green-700 rounded-lg">
-          <h3 className="text-xl font-semibold mb-2">Listener Features</h3>
-          <p className="text-gray-300">Discover and enjoy music from your favorite artists.</p>
-        </div>
-      </UserTypeGuard>
     </div>
   );
 }
