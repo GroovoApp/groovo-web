@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import Image from "next/image";
 import TableSongElement from "@/src/app/components/ui/tableSongElement";
 import { useParams } from "next/navigation";
 import { fetchWithAuth } from "@/src/app/utils/api";
 import { useSignalR } from "@/src/app/contexts/SignalRContext";
+import Button from "@/src/app/components/ui/button";
+import { PlayerContext } from "@/src/app/dashboard/layout";
 
 type Song = {
   id: string;
@@ -29,46 +31,95 @@ type Playlist = {
 export default function PlaylistPage() {
   const params = useParams();
   const { id } = params;
-  const { joinPlaylist, leavePlaylist, getPlaybackState, isConnected } = useSignalR();
+  const { connect, joinPlaylist, leavePlaylist, getPlaybackState, isConnected, playSong, playbackState, setPlaylistSongs } = useSignalR();
+  const { setCurrentSong } = useContext(PlayerContext);
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [hasJoinedPlaylist, setHasJoinedPlaylist] = useState(false);
+
+  const handlePlayPlaylist = async () => {
+    if (!id || !playlist) return;
+    
+    try {
+      // Connect to SignalR if not already connected
+      if (!isConnected) {
+        await connect();
+      }
+      
+      // Set the playlist songs in the context
+      const songIds = playlist.songs.map(song => song.id);
+      setPlaylistSongs(songIds);
+      
+      // Open the player by setting the first song
+      if (playlist.songs.length > 0) {
+        setCurrentSong(playlist.songs[0] as any);
+      }
+      
+      // Join the playlist
+      await joinPlaylist(id as string);
+      setHasJoinedPlaylist(true);
+      
+      // Get current playback state
+      await getPlaybackState();
+      
+    } catch (err) {
+      // Error handling can be added here if needed
+    }
+  };
+
   useEffect(() => {
     async function fetchPlaylist() {
       try {
         const res = await fetchWithAuth(`http://localhost:8080/api/v1/Playlists/${id}`);
+        const resSongs = await fetchWithAuth(`http://localhost:8080/api/v1/Playlists/${id}/songs`);
+        
         if (!res.ok) throw new Error(`Failed to fetch playlist: ${res.status}`);
+        if (!resSongs.ok) throw new Error(`Failed to fetch songs: ${resSongs.status}`);
+        
         const json = await res.json();
+        const jsonSongs = await resSongs.json();
 
         if (!json.success || !json.data) {
           throw new Error("Playlist not found or API error");
         }
 
         const apiData = json.data;
+        const songsData = jsonSongs.success && jsonSongs.data ? jsonSongs.data : [];
 
-        // Map API data to our internal Playlist/Song types
         const mappedPlaylist: Playlist = {
           id: apiData.id,
           name: apiData.name,
           description: apiData.description,
           image: "https://picsum.photos/seed/" + apiData.id + "/200/200",
           creator: apiData.owners?.[0]?.name || "Unknown",
-          songs: (apiData.songs || []).map((s: any) => ({
-            id: s.id,
-            title: s.name,
-            album: "", // API does not provide album
-            image: "http://localhost:5039/contents/images/" + s.id,
-            author: s.authorNames?.join(", ") || "Unknown",
-            dateAdded: new Date(s.releaseDate).toLocaleDateString(),
-            duration: s.duration,
-          })),
+          songs: songsData.map((s: any) => {
+            // Handle authors - could be array or single object
+            let authorName = "Unknown";
+            if (s.authors) {
+              if (Array.isArray(s.authors)) {
+                authorName = s.authors.map((a: any) => a.name).join(", ");
+              } else if (s.authors.name) {
+                authorName = s.authors.name;
+              }
+            }
+            
+            return {
+              id: s.id,
+              title: s.name,
+              album: "", // API does not provide album
+              image: "http://localhost:5039/contents/images/" + s.id,
+              author: authorName,
+              dateAdded: new Date(s.releaseDate).toLocaleDateString(),
+              duration: s.duration,
+            };
+          }),
         };
 
         setPlaylist(mappedPlaylist);
       } catch (err: any) {
-        console.error(err);
         setError(err.message || "An error occurred");
       } finally {
         setLoading(false);
@@ -77,28 +128,6 @@ export default function PlaylistPage() {
 
     fetchPlaylist();
   }, [id]);
-
-  // Join playlist via SignalR when component mounts and connection is ready
-  useEffect(() => {
-    if (!id || !isConnected) return;
-
-    joinPlaylist(id as string)
-      .then(() => {
-        console.log('Successfully joined playlist:', id);
-        // Request current playback state after joining
-        return getPlaybackState();
-      })
-      .then(() => {
-        console.log('Requested playback state');
-      })
-      .catch((err) => console.error('Failed to join playlist or get state:', err));
-
-    return () => {
-      leavePlaylist()
-        .then(() => console.log('Successfully left playlist:', id))
-        .catch((err) => console.error('Failed to leave playlist:', err));
-    };
-  }, [id, isConnected, joinPlaylist, leavePlaylist, getPlaybackState]);
 
   if (loading) return <p className="p-8">Loading playlist...</p>;
   if (error) return <p className="p-8 text-red-500">{error}</p>;
@@ -120,6 +149,20 @@ export default function PlaylistPage() {
           {playlist.description && <p className="text-gray-400">{playlist.description}</p>}
           <p className="text-gray-400 text-sm mt-4">Delightfully crafted by {playlist.creator}</p>
           <p className="text-gray-400 text-sm">{playlist.songs.length} {playlist.songs.length === 1 ? "song" : "songs"}</p>
+          
+          {/* Play Button */}
+          <div className="mt-4">
+            <Button
+              onClick={handlePlayPlaylist}
+              disabled={hasJoinedPlaylist}
+              variant="default"
+              size="md"
+              width="auto"
+              className="px-8"
+            >
+              {hasJoinedPlaylist ? '✓ Joined & Playing' : isConnected ? '▶ Join & Play' : '🔌 Connect & Play'}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -137,7 +180,7 @@ export default function PlaylistPage() {
           </thead>
           <tbody>
             {playlist.songs.map((song, index) => (
-              <TableSongElement song={song} index={index + 1} />
+              <TableSongElement song={song} key={song.id} index={index + 1} />
             ))}
           </tbody>
         </table>

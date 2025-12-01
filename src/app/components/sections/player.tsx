@@ -12,6 +12,7 @@ import {
   ArrowPathRoundedSquareIcon,
   ArrowsRightLeftIcon,
 } from "@heroicons/react/24/solid";
+import { fetchWithAuth } from "../../utils/api";
 
 export default function Player() {
   const {
@@ -19,67 +20,133 @@ export default function Player() {
     setCurrentSong,
     isPlaying,
     setIsPlaying,
-    isShuffled,
-    setIsShuffled,
-    repeatMode,
-    setRepeatMode,
   } = useContext(PlayerContext);
 
-  const { playbackState, playSong, playPause, seek, isConnected } = useSignalR();
+  const { playbackState, playSong, playPause, seek, isConnected, setPlayerControls } = useSignalR();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.7);
+  const nextAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
+  const [volume, setVolume] = useState<number>(0.7);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const controlsRegistered = useRef(false);
+  const lastProcessedSongId = useRef<string | null>(null);
+  const lastIsPlayingState = useRef<boolean>(false);
+  const lastPreloadedNextSongId = useRef<string | null>(null);
+
+  // Register player controls with SignalR context only once
+  useEffect(() => {
+    if (controlsRegistered.current) return;
+    
+    const controls = {
+      play: () => {
+        if (audioRef.current && audioRef.current.readyState >= 2) {
+          audioRef.current.play().catch((error) => {
+            console.error('Error playing audio:', error);
+          });
+        }
+      },
+      pause: () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+      },
+      seekTo: (position: number) => {
+        if (audioRef.current) {
+          audioRef.current.currentTime = position;
+        }
+      },
+      getCurrentPosition: () => {
+        return audioRef.current?.currentTime || 0;
+      },
+      loadSong: (songId: string) => {
+        if (audioRef.current) {
+          const audioUrl = `http://localhost:5039/contents/audio/${songId}`;
+          audioRef.current.src = audioUrl;
+          audioRef.current.load();
+        }
+      },
+    };
+
+    setPlayerControls(controls);
+    controlsRegistered.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync with SignalR playback state
   useEffect(() => {
     if (!playbackState || !audioRef.current) return;
 
-    console.log('Received playback state update:', playbackState);
+    console.log('📥 Received server state:', { songId: playbackState.currentSongId, isPlaying: playbackState.isPlaying, position: playbackState.currentPosition });
+
+    if (playbackState.currentSongId === null) return;
 
     // Update isPlaying based on server state
-    if (playbackState.isPlaying !== isPlaying) {
+    if (playbackState.isPlaying !== lastIsPlayingState.current) {
+      lastIsPlayingState.current = playbackState.isPlaying;
       setIsPlaying(playbackState.isPlaying);
+      
+      // Control audio element based on server state
+      if (playbackState.isPlaying) {
+        if (audioRef.current.readyState >= 2) {
+          audioRef.current.play().catch((error) => {
+            console.error("Error playing audio:", error);
+          });
+        }
+      } else {
+        audioRef.current.pause();
+      }
     }
 
-    // Update current position and sync audio element
+    // Update current position and sync audio element (only if not seeking)
     if (!isSeeking) {
       const timeDiff = Math.abs(audioRef.current.currentTime - playbackState.currentPosition);
-      // Only seek if difference is significant (> 1 second) to avoid jitter
+      // Only seek if difference is significant to avoid jitter
       if (timeDiff > 1) {
         audioRef.current.currentTime = playbackState.currentPosition;
+        setCurrentTime(playbackState.currentPosition);
       }
-      setCurrentTime(playbackState.currentPosition);
     }
 
     // Update duration
-    if (playbackState.currentLength !== duration) {
+    if (playbackState.currentLength !== duration && playbackState.currentLength > 0) {
       setDuration(playbackState.currentLength);
     }
 
     // If song changed, fetch song details and update current song
-    if (playbackState.currentSongId && playbackState.currentSongId !== currentSong?.id) {
+    if (playbackState.currentSongId && playbackState.currentSongId !== lastProcessedSongId.current) {
+      lastProcessedSongId.current = playbackState.currentSongId;
+      
       // Fetch song details from API
       const fetchSongDetails = async () => {
         try {
-          const response = await fetch(`http://localhost:8080/api/v1/Songs/${playbackState.currentSongId}`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-            },
+          const response = await fetchWithAuth(`http://localhost:8080/api/v1/Songs/${playbackState.currentSongId}`, {
           });
           
           if (response.ok) {
             const json = await response.json();
             if (json.success && json.data) {
               const songData = json.data;
+              console.log("Fetched song details:", songData);
+              
+              // Handle authors - could be array or single object
+              let authorName = "Unknown";
+              if (songData.authors) {
+                if (Array.isArray(songData.authors)) {
+                  authorName = songData.authors.map((a: any) => a.name).join(", ");
+                } else if (songData.authors.name) {
+                  authorName = songData.authors.name;
+                }
+              }
+              
               const newSong = {
                 id: songData.id,
                 title: songData.name,
                 album: "", // API doesn't provide album
                 image: `http://localhost:5039/contents/images/${songData.id}`,
-                author: songData.authorNames?.join(", ") || "Unknown",
+                author: authorName,
                 dateAdded: new Date(songData.releaseDate).toLocaleDateString(),
                 duration: songData.duration,
               };
@@ -93,18 +160,45 @@ export default function Player() {
 
       fetchSongDetails();
 
+      // Pause current playback before loading new song to prevent interruption error
+      audioRef.current.pause();
+      
       // Load the new song audio
       const audioUrl = `http://localhost:5039/contents/audio/${playbackState.currentSongId}`;
+      setIsLoadingAudio(true);
       audioRef.current.src = audioUrl;
-      audioRef.current.currentTime = playbackState.currentPosition;
       audioRef.current.load();
-      if (playbackState.isPlaying) {
-        audioRef.current.play().catch((error) => {
-          console.error("Error playing audio:", error);
-        });
-      }
+      
+      // Wait for audio to be ready before playing
+      const handleCanPlay = () => {
+        if (audioRef.current && playbackState.isPlaying) {
+          audioRef.current.currentTime = playbackState.currentPosition;
+          audioRef.current.play().catch((error) => {
+            console.error("Error playing audio:", error);
+          });
+        }
+        setIsLoadingAudio(false);
+        audioRef.current?.removeEventListener('canplay', handleCanPlay);
+      };
+      
+      audioRef.current.addEventListener('canplay', handleCanPlay);
     }
-  }, [playbackState, currentSong?.id, setCurrentSong, isPlaying, setIsPlaying, duration, isSeeking]);
+
+    // Preload next song if provided by server
+    if (playbackState.nextSongId && playbackState.nextSongId !== lastPreloadedNextSongId.current) {
+      lastPreloadedNextSongId.current = playbackState.nextSongId;
+      
+      if (!nextAudioRef.current) {
+        nextAudioRef.current = new Audio();
+      }
+      
+      const nextAudioUrl = `http://localhost:5039/contents/audio/${playbackState.nextSongId}`;
+      nextAudioRef.current.src = nextAudioUrl;
+      nextAudioRef.current.load();
+      console.log('🔄 Preloading next song:', playbackState.nextSongId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playbackState, isSeeking]);
 
   // Parse duration from song (format: "MM:SS" or "H:MM:SS")
   const parseDuration = (durationString: string): number => {
@@ -128,42 +222,16 @@ export default function Player() {
     return () => clearInterval(interval);
   }, [isPlaying, isSeeking]);
 
-  // Load song when currentSong changes
+  // This effect is no longer needed - songs are loaded from server state only
+  // Keeping for duration parsing from initial song metadata
   useEffect(() => {
-    if (!currentSong?.id || !audioRef.current) return;
-
-    setCurrentTime(0);
-
-    if (currentSong.duration) {
-      const parsedDuration = parseDuration(currentSong.duration);
+    if (!currentSong?.duration) return;
+    
+    const parsedDuration = parseDuration(currentSong.duration);
+    if (parsedDuration > 0 && parsedDuration !== duration) {
       setDuration(parsedDuration);
     }
-
-    const audioUrl = `http://localhost:5039/contents/audio/${currentSong.id}`;
-    audioRef.current.src = audioUrl;
-    audioRef.current.load();
-
-    if (isPlaying) {
-      audioRef.current.play().catch((error) => {
-        console.error("Error playing audio:", error);
-        setIsPlaying(false);
-      });
-    }
-  }, [currentSong?.id, currentSong?.duration, isPlaying, setIsPlaying]);
-
-  // Handle play/pause
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.play().catch((error) => {
-        console.error("Error playing audio:", error);
-        setIsPlaying(false);
-      });
-    } else {
-      audioRef.current.pause();
-    }
-  }, [isPlaying, setIsPlaying]);
+  }, [currentSong?.duration, duration]);
 
   // Handle volume changes
   useEffect(() => {
@@ -177,31 +245,18 @@ export default function Player() {
       console.warn('Not connected to SignalR');
       return;
     }
-    try {
-      // Wait for server to acknowledge before state updates via PlaybackState callback
-      await playSong(null);
-      console.log('PlaySong (next) acknowledged by server');
-    } catch (error) {
-      console.error('Error playing next song:', error);
-    }
-  };
-
-  const handlePrevious = async () => {
-    if (!isConnected) {
-      console.warn('Not connected to SignalR');
+    
+    // Check if there's a next song available
+    if (!playbackState?.nextSongId) {
+      console.warn('No next song available');
       return;
     }
-    if (audioRef.current && currentTime > 3) {
-      try {
-        // Wait for server to acknowledge seek command
-        await seek(0);
-        console.log('Seek to start acknowledged by server');
-      } catch (error) {
-        console.error('Error seeking to start:', error);
-      }
-    } else {
-      // TODO: Implement previous song logic
-      console.log('Previous song not yet implemented');
+    
+    console.log('📤 Sending PlaySong: next');
+    try {
+      await playSong(null);
+    } catch (error) {
+      console.error('Error playing next song:', error);
     }
   };
 
@@ -217,12 +272,7 @@ export default function Player() {
     };
 
     const handleEnded = () => {
-      if (repeatMode === "one") {
-        audio.currentTime = 0;
-        audio.play();
-      } else {
-        handleNext();
-      }
+      handleNext();
     };
 
     audio.addEventListener("durationchange", handleDurationChange);
@@ -232,7 +282,7 @@ export default function Player() {
       audio.removeEventListener("durationchange", handleDurationChange);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [repeatMode]);
+  }, [handleNext]);
 
   if (!currentSong) return null;
 
@@ -241,24 +291,12 @@ export default function Player() {
       console.warn('Not connected to SignalR');
       return;
     }
-    console.log("Toggle play clicked. Current isPlaying:", isPlaying, "-> Sending:", !isPlaying);
+    console.log('📤 Sending PlayPause:', !isPlaying);
     try {
-      // Wait for server to acknowledge before state updates via PlaybackState callback
       await playPause(!isPlaying);
-      console.log('PlayPause acknowledged by server');
     } catch (error) {
       console.error('Error toggling play/pause:', error);
     }
-  };
-
-  const toggleShuffle = () => {
-    setIsShuffled(!isShuffled);
-  };
-
-  const toggleRepeat = () => {
-    if (repeatMode === "off") setRepeatMode("all");
-    else if (repeatMode === "all") setRepeatMode("one");
-    else setRepeatMode("off");
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,10 +314,9 @@ export default function Player() {
     if (!isConnected || isSeeking === false) return;
     
     const seekPosition = Math.floor(currentTime);
+    console.log('📤 Sending Seek:', seekPosition);
     try {
-      // Wait for server acknowledgment before seeking audio
       await seek(seekPosition);
-      console.log('Seek acknowledged by server, position:', seekPosition);
       setIsSeeking(false);
     } catch (error) {
       console.error('Error seeking:', error);
@@ -299,10 +336,12 @@ export default function Player() {
   };
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-6xl bg-neutral-800 border border-neutral-700 rounded-lg shadow-2xl">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-6xl bg-neutral-800 border border-neutral-700 rounded-lg shadow-2xl px-4 overflow-hidden">
       <audio ref={audioRef} />
+      {/* Hidden audio element for preloading next song */}
+      <audio ref={nextAudioRef} style={{ display: 'none' }} />
 
-      <div className="flex items-center justify-between px-4 py-3 gap-4">
+      <div className="flex items-center justify-between py-3 gap-4">
         {/* Left: Song Info */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <Image
@@ -322,24 +361,6 @@ export default function Player() {
         <div className="flex flex-col items-center gap-2 flex-1">
           <div className="flex items-center gap-3">
             <button
-              onClick={toggleShuffle}
-              className={`p-2 rounded-full hover:bg-neutral-700 transition ${
-                isShuffled ? "text-green-500" : "text-gray-400"
-              }`}
-              title="Shuffle"
-            >
-              <ArrowsRightLeftIcon className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={handlePrevious}
-              className="p-2 rounded-full hover:bg-neutral-700 transition text-white"
-              title="Previous"
-            >
-              <BackwardIcon className="w-5 h-5" />
-            </button>
-
-            <button
               onClick={togglePlay}
               className="p-3 rounded-full bg-white hover:bg-gray-200 transition text-black"
               title={isPlaying ? "Pause" : "Play"}
@@ -353,26 +374,17 @@ export default function Player() {
 
             <button
               onClick={handleNext}
-              className="p-2 rounded-full hover:bg-neutral-700 transition text-white"
-              title="Next"
+              className={`p-2 rounded-full transition text-white ${
+                playbackState?.nextSongId 
+                  ? 'hover:bg-neutral-700 cursor-pointer' 
+                  : 'opacity-30 cursor-not-allowed'
+              }`}
+              title={playbackState?.nextSongId ? "Next" : "No next song"}
+              disabled={!playbackState?.nextSongId}
             >
               <ForwardIcon className="w-5 h-5" />
             </button>
 
-            <button
-              onClick={toggleRepeat}
-              className={`p-2 rounded-full hover:bg-neutral-700 transition relative ${
-                repeatMode !== "off" ? "text-green-500" : "text-gray-400"
-              }`}
-              title={`Repeat: ${repeatMode}`}
-            >
-              <ArrowPathRoundedSquareIcon className="w-4 h-4" />
-              {repeatMode === "one" && (
-                <span className="absolute text-[10px] font-bold top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                  1
-                </span>
-              )}
-            </button>
           </div>
 
           {/* Progress Bar */}
@@ -384,7 +396,7 @@ export default function Player() {
               type="range"
               min="0"
               max={duration || 0}
-              value={currentTime}
+              value={currentTime || 0}
               onChange={handleSeek}
               onMouseUp={handleSeekEnd}
               onTouchEnd={handleSeekEnd}
@@ -420,7 +432,7 @@ export default function Player() {
               min="0"
               max="1"
               step="0.01"
-              value={volume}
+              value={volume || 0.7}
               onChange={handleVolumeChange}
               className="flex-1 h-1 bg-neutral-700 rounded-full appearance-none cursor-pointer
                 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 

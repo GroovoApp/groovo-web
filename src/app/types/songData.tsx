@@ -18,8 +18,9 @@ export interface SongData {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  length: number;   // in seconds
+  duration: string;  // Format: "MM:SS"
+  durationSeconds: number;  // Duration in seconds
   plays: number;
   likes: number;
-  authors: AuthorData;
+  authors: AuthorData[];  // Array of authors, not single object
 }

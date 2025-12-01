@@ -14,14 +14,16 @@ export default function TableSongElement({ song, index }: Props) {
   const { setCurrentSong } = useContext(CurrentSongContext);
   const { playSong, isConnected } = useSignalR();
 
-  const handlePlaySong = () => {
-    setCurrentSong(song);
-    
+  const handlePlaySong = async () => {
     // Send play command to SignalR if connected
     if (isConnected && song.id) {
-      playSong(song.id).catch((error) => {
+      console.log('📤 Sending PlaySong:', song.id);
+      try {
+        await playSong(song.id);
+        // Server will send PlaybackState which will update currentSong
+      } catch (error) {
         console.error('Error playing song via SignalR:', error);
-      });
+      }
     }
   };
 

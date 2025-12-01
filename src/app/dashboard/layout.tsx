@@ -23,8 +23,6 @@ export const PlayerContext = React.createContext<{
   setIsPlaying: (playing: boolean) => void;
   isShuffled: boolean;
   setIsShuffled: (shuffled: boolean) => void;
-  repeatMode: "off" | "all" | "one";
-  setRepeatMode: (mode: "off" | "all" | "one") => void;
 }>({
   currentSong: null,
   setCurrentSong: () => {},
@@ -32,8 +30,6 @@ export const PlayerContext = React.createContext<{
   setIsPlaying: () => {},
   isShuffled: false,
   setIsShuffled: () => {},
-  repeatMode: "off",
-  setRepeatMode: () => {},
 });
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -66,8 +62,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             setIsPlaying,
             isShuffled,
             setIsShuffled,
-            repeatMode,
-            setRepeatMode,
           }}
         >
           <div className="flex flex-col h-screen">

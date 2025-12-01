@@ -12,28 +12,46 @@ type PlaybackState = {
   lastUpdated: string;
 };
 
+type PlayerControls = {
+  play: () => void;
+  pause: () => void;
+  seekTo: (position: number) => void;
+  getCurrentPosition: () => number;
+  loadSong: (songId: string) => void;
+};
+
 type SignalRContextType = {
   connection: signalR.HubConnection | null;
   isConnected: boolean;
   playbackState: PlaybackState | null;
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
   joinPlaylist: (playlistId: string) => Promise<void>;
   leavePlaylist: () => Promise<void>;
   playSong: (songId: string | null) => Promise<void>;
   playPause: (status: boolean) => Promise<void>;
   seek: (position: number) => Promise<void>;
   getPlaybackState: () => Promise<void>;
+  activateState: (state: PlaybackState) => Promise<void>;
+  setPlaylistSongs: (songIds: string[]) => void;
+  setPlayerControls: (controls: PlayerControls | null) => void;
 };
 
 const SignalRContext = createContext<SignalRContextType>({
   connection: null,
   isConnected: false,
   playbackState: null,
+  connect: async () => {},
+  disconnect: async () => {},
   joinPlaylist: async () => {},
   leavePlaylist: async () => {},
   playSong: async () => {},
   playPause: async () => {},
   seek: async () => {},
   getPlaybackState: async () => {},
+  activateState: async () => {},
+  setPlaylistSongs: () => {},
+  setPlayerControls: () => {},
 });
 
 export const useSignalR = () => useContext(SignalRContext);
@@ -42,13 +60,22 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [playbackState, setPlaybackState] = useState<PlaybackState | null>(null);
+  const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
+  const [currentPlaylistSongs, setCurrentPlaylistSongs] = useState<string[]>([]);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
+  const playlistSongsRef = useRef<string[]>([]);
+  const playerControlsRef = useRef<PlayerControls | null>(null);
 
-  useEffect(() => {
+  const connect = async () => {
+    console.log('Attempting to connect to SignalR...', { isConnected, connectionExists: !!connectionRef.current });
+    if (connectionRef.current && isConnected) {
+      console.log('Already connected');
+      return;
+    }
+
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      console.warn('No access token found, skipping SignalR connection');
-      return;
+      throw new Error('No access token found');
     }
 
     console.log('Initializing SignalR connection to http://localhost:5039/live');
@@ -71,26 +98,8 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
     // Listen for PlaybackState updates from server
     newConnection.on('PlaybackState', (state: PlaybackState) => {
       console.log('Received PlaybackState:', state);
-      setPlaybackState(state);
+      activateState(state);
     });
-
-    // Start connection
-    console.log('Starting SignalR connection...');
-    newConnection
-      .start()
-      .then(() => {
-        console.log('✅ SignalR Connected successfully');
-        setIsConnected(true);
-      })
-      .catch((err) => {
-        console.error('❌ SignalR Connection Error:', err);
-        console.error('Error details:', {
-          message: err.message,
-          statusCode: err.statusCode,
-          url: 'http://localhost:5039/live'
-        });
-        setIsConnected(false);
-      });
 
     // Handle reconnection events
     newConnection.onreconnecting((error) => {
@@ -108,19 +117,59 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(false);
     });
 
-    return () => {
-      if (connectionRef.current) {
-        connectionRef.current.stop();
+    // Start connection
+    console.log('Starting SignalR connection...');
+    try {
+      await newConnection.start();
+      console.log('✅ SignalR Connected successfully');
+      setIsConnected(true);
+    } catch (err: any) {
+      console.error('❌ SignalR Connection Error:', err);
+      console.error('Error details:', {
+        message: err.message,
+        statusCode: err.statusCode,
+        url: 'http://localhost:5039/live'
+      });
+      setIsConnected(false);
+      throw err;
+    }
+  };
+
+  const disconnect = async () => {
+    if (connectionRef.current) {
+      await connectionRef.current.stop();
+      connectionRef.current = null;
+      setConnection(null);
+      setIsConnected(false);
+      console.log('SignalR disconnected');
+    }
+  };
+
+  const activateState = async (state: PlaybackState) => {
+    if (state.currentSongId === null) {
+      if (playlistSongsRef.current.length === 0) return;
+      // Play the first song from the playlist
+      const firstSongId = playlistSongsRef.current[0];
+      console.log('Playing first song in playlist:', firstSongId);
+      try {
+        setPlaybackState(state);
+        await playSong(firstSongId);
+      } catch (err) {
+        console.error('Failed to play first song:', err);
       }
-    };
-  }, []);
+      return;
+    }
+    setPlaybackState(state);
+  };
 
   const joinPlaylist = async (playlistId: string) => {
-    if (!connection || !isConnected) {
+    const currentConnection = connectionRef.current;
+    if (!currentConnection || currentConnection.state !== signalR.HubConnectionState.Connected) {
       throw new Error('SignalR connection not established');
     }
     try {
-      await connection.invoke('JoinPlaylist', playlistId);
+      await currentConnection.invoke('JoinPlaylist', playlistId);
+      setCurrentPlaylistId(playlistId);
       console.log('Joined playlist:', playlistId);
     } catch (err) {
       console.error('Error joining playlist:', err);
@@ -129,13 +178,17 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   };
 
   const leavePlaylist = async () => {
-    if (!connection || !isConnected) {
+    const currentConnection = connectionRef.current;
+    if (!currentConnection || currentConnection.state !== signalR.HubConnectionState.Connected) {
       throw new Error('SignalR connection not established');
     }
     try {
-      await connection.invoke('LeavePlaylist');
+      await currentConnection.invoke('LeavePlaylist');
       console.log('Left playlist');
       setPlaybackState(null);
+      setCurrentPlaylistId(null);
+      setCurrentPlaylistSongs([]);
+      playlistSongsRef.current = [];
     } catch (err) {
       console.error('Error leaving playlist:', err);
       throw err;
@@ -143,12 +196,12 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   };
 
   const playSong = async (songId: string | null) => {
-    if (!connection || !isConnected) {
+    const currentConnection = connectionRef.current;
+    if (!currentConnection || currentConnection.state !== signalR.HubConnectionState.Connected) {
       throw new Error('SignalR connection not established');
     }
     try {
-      await connection.invoke('PlaySong', songId);
-      console.log('PlaySong invoked:', songId);
+      await currentConnection.invoke('PlaySong', songId);
     } catch (err) {
       console.error('Error playing song:', err);
       throw err;
@@ -156,12 +209,12 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   };
 
   const playPause = async (status: boolean) => {
-    if (!connection || !isConnected) {
+    const currentConnection = connectionRef.current;
+    if (!currentConnection || currentConnection.state !== signalR.HubConnectionState.Connected) {
       throw new Error('SignalR connection not established');
     }
     try {
-      await connection.invoke('PlayPause', status);
-      console.log('PlayPause invoked:', status);
+      await currentConnection.invoke('PlayPause', status);
     } catch (err) {
       console.error('Error toggling play/pause:', err);
       throw err;
@@ -169,12 +222,12 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   };
 
   const seek = async (position: number) => {
-    if (!connection || !isConnected) {
+    const currentConnection = connectionRef.current;
+    if (!currentConnection || currentConnection.state !== signalR.HubConnectionState.Connected) {
       throw new Error('SignalR connection not established');
     }
     try {
-      await connection.invoke('Seek', position);
-      console.log('Seek invoked:', position);
+      await currentConnection.invoke('Seek', position);
     } catch (err) {
       console.error('Error seeking:', err);
       throw err;
@@ -182,16 +235,30 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getPlaybackState = async () => {
-    if (!connection || !isConnected) {
+    const currentConnection = connectionRef.current;
+    console.log('getPlaybackState check - connection exists:', !!currentConnection, 'state:', currentConnection?.state);
+    
+    if (!currentConnection || currentConnection.state !== signalR.HubConnectionState.Connected) {
+      console.error('Cannot get playback state: SignalR connection not established');
       throw new Error('SignalR connection not established');
     }
     try {
-      await connection.invoke('GetPlaybackState');
-      console.log('GetPlaybackState invoked');
+      await currentConnection.invoke('GetPlaybackState');
     } catch (err) {
       console.error('Error getting playback state:', err);
       throw err;
     }
+  };
+
+  const setPlaylistSongs = (songIds: string[]) => {
+    playlistSongsRef.current = songIds;
+    setCurrentPlaylistSongs(songIds);
+    console.log('Playlist songs updated:', songIds.length, 'songs', playlistSongsRef.current);
+  };
+
+  const setPlayerControls = (controls: PlayerControls | null) => {
+    playerControlsRef.current = controls;
+    console.log('Player controls set:', controls ? 'Controls available' : 'Controls cleared');
   };
 
   return (
@@ -200,12 +267,17 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
         connection,
         isConnected,
         playbackState,
+        connect,
+        disconnect,
         joinPlaylist,
         leavePlaylist,
         playSong,
         playPause,
         seek,
         getPlaybackState,
+        activateState,
+        setPlaylistSongs,
+        setPlayerControls,
       }}
     >
       {children}
