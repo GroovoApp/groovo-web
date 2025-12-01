@@ -1,0 +1,54 @@
+"use client";
+import React, { useContext } from "react";
+import Image from "next/image";
+import { Song } from "@/src/app/types/song"; // adjust path
+import { CurrentSongContext } from "@/src/app/dashboard/layout";
+import { useSignalR } from "@/src/app/contexts/SignalRContext";
+
+type Props = {
+  song: Song;
+  index: number;
+  onContextMenu?: (e: React.MouseEvent, songId: string) => void;
+};
+
+export default function TableSongElement({ song, index, onContextMenu }: Props) {
+  const { setCurrentSong } = useContext(CurrentSongContext);
+  const { playSong, isConnected } = useSignalR();
+
+  const handlePlaySong = async () => {
+    // Send play command to SignalR if connected
+    if (isConnected && song.id) {
+      console.log('📤 Sending PlaySong:', song.id);
+      try {
+        await playSong(song.id);
+        // Server will send PlaybackState which will update currentSong
+      } catch (error) {
+        console.error('Error playing song via SignalR:', error);
+      }
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onContextMenu) {
+      onContextMenu(e, song.id);
+    }
+  };
+
+  return (
+    <tr
+      className="transition-background transition-200 hover:bg-neutral-700 rounded-lg cursor-pointer select-none"
+      onDoubleClick={handlePlaySong}
+      onContextMenu={handleContextMenu}
+    >
+      <td className="py-2 text-sm">{index}</td>
+      <td className="py-2 text-sm flex items-center gap-2">
+        <Image src={song.image} alt={song.title} width={40} height={40} className="rounded-md aspect-square object-cover" />
+        {song.title}
+      </td>
+      <td className="py-2 text-sm">{song.album || "Album"}</td>
+      <td className="py-2 text-sm">{song.dateAdded}</td>
+      <td className="py-2 text-sm">{song.duration}</td>
+    </tr>
+  );
+}
