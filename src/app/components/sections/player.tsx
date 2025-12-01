@@ -11,6 +11,8 @@ import {
   BackwardIcon,
   ArrowPathRoundedSquareIcon,
   ArrowsRightLeftIcon,
+  SpeakerWaveIcon,
+  SpeakerXMarkIcon,
 } from "@heroicons/react/24/solid";
 import { fetchWithAuth } from "../../utils/api";
 
@@ -284,6 +286,27 @@ export default function Player() {
     };
   }, [handleNext]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only trigger if not typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [isConnected, isPlaying]);
+
   if (!currentSong) return null;
 
   const togglePlay = async () => {
@@ -343,7 +366,7 @@ export default function Player() {
 
       <div className="flex items-center justify-between py-3 gap-4">
         {/* Left: Song Info */}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-3 min-w-0 flex-1 pl-2">
           <Image
             src={currentSong.image}
             alt={currentSong.title}
@@ -422,17 +445,19 @@ export default function Player() {
         </div>
 
         {/* Right: Volume */}
-        <div className="flex items-center gap-3 flex-1 justify-end">
-          <div className="flex items-center gap-2 w-32">
-            <span className="text-lg">
-              {volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}
-            </span>
+        <div className="flex items-center gap-3 flex-1 justify-end pr-4">
+          <div className="flex items-center gap-2 max-w-[140px] w-full">
+            {volume === 0 ? (
+              <SpeakerXMarkIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            ) : (
+              <SpeakerWaveIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            )}
             <input
               type="range"
               min="0"
               max="1"
               step="0.01"
-              value={volume || 0.7}
+              value={volume}
               onChange={handleVolumeChange}
               className="flex-1 h-1 bg-neutral-700 rounded-full appearance-none cursor-pointer
                 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 
