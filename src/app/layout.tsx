@@ -16,6 +16,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Groovo | The friendly music app",
   description: "Groovo | The friendly music app. Build playlists with friends and share your favorite tunes.",
+  icons: {
+    icon: [
+      { url: "/Groovo.svg", type: "image/svg+xml" },
+    ],
+    apple: "/Groovo.svg",
+  },
 };
 
 export default function RootLayout({

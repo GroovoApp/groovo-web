@@ -42,10 +42,13 @@ export default function TopNav() {
       <div className="flex items-center justify-between w-full">
         {/* Left: logo */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-green-600 rounded-sm flex items-center justify-center font-bold">
-            G
-          </div>
-          <span className="font-semibold text-lg">Groovo</span>
+          <Image
+            src="/Groovo.svg"
+            alt="Groovo Logo"
+            width={120}
+            height={32}
+            priority
+          />
         </div>
 
         {/* Center: search bar */}

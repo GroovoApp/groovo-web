@@ -78,7 +78,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {children}
               </div>
 
-              {userType?.toLowerCase() !== "author" && (
+              {userType?.toLowerCase() !== "author" && currentSong && (
                 <div className="flex-shrink-0 h-full">
                   <RightSideNav currentSong={currentSong} />
                 </div>

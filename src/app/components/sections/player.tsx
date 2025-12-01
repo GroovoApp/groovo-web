@@ -65,7 +65,8 @@ export default function Player() {
       },
       loadSong: (songId: string) => {
         if (audioRef.current) {
-          const audioUrl = `http://localhost:5039/contents/audio/${songId}`;
+          const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
+          const audioUrl = `${contentBase}/contents/audio/${songId}`;
           audioRef.current.src = audioUrl;
           audioRef.current.load();
         }
@@ -124,7 +125,8 @@ export default function Player() {
       // Fetch song details from API
       const fetchSongDetails = async () => {
         try {
-          const response = await fetchWithAuth(`http://localhost:8080/api/v1/Songs/${playbackState.currentSongId}`, {
+          const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+          const response = await fetchWithAuth(`${apiBase}/api/v1/Songs/${playbackState.currentSongId}`, {
           });
           
           if (response.ok) {
@@ -143,11 +145,12 @@ export default function Player() {
                 }
               }
               
+              const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
               const newSong = {
                 id: songData.id,
                 title: songData.name,
                 album: "", // API doesn't provide album
-                image: `http://localhost:5039/contents/images/${songData.id}`,
+                image: `${contentBase}/contents/images/${songData.id}`,
                 author: authorName,
                 dateAdded: new Date(songData.releaseDate).toLocaleDateString(),
                 duration: songData.duration,
@@ -166,7 +169,8 @@ export default function Player() {
       audioRef.current.pause();
       
       // Load the new song audio
-      const audioUrl = `http://localhost:5039/contents/audio/${playbackState.currentSongId}`;
+      const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
+      const audioUrl = `${contentBase}/contents/audio/${playbackState.currentSongId}`;
       setIsLoadingAudio(true);
       audioRef.current.src = audioUrl;
       audioRef.current.load();
@@ -194,7 +198,8 @@ export default function Player() {
         nextAudioRef.current = new Audio();
       }
       
-      const nextAudioUrl = `http://localhost:5039/contents/audio/${playbackState.nextSongId}`;
+      const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
+      const nextAudioUrl = `${contentBase}/contents/audio/${playbackState.nextSongId}`;
       nextAudioRef.current.src = nextAudioUrl;
       nextAudioRef.current.load();
       console.log('🔄 Preloading next song:', playbackState.nextSongId);

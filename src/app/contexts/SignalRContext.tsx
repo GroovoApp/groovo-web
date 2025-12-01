@@ -78,10 +78,12 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No access token found');
     }
 
-    console.log('Initializing SignalR connection to http://localhost:5039/live');
+    const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
+    const hubUrl = `${contentBase}/live`;
+    console.log('Initializing SignalR connection to', hubUrl);
 
     const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5039/live', {
+      .withUrl(hubUrl, {
         accessTokenFactory: () => {
           const currentToken = localStorage.getItem('accessToken');
           console.log('Providing token for SignalR connection:', currentToken ? 'Token found' : 'No token');
@@ -125,10 +127,11 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(true);
     } catch (err: any) {
       console.error('❌ SignalR Connection Error:', err);
+      const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
       console.error('Error details:', {
         message: err.message,
         statusCode: err.statusCode,
-        url: 'http://localhost:5039/live'
+        url: `${contentBase}/live`
       });
       setIsConnected(false);
       throw err;

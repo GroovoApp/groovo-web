@@ -73,8 +73,9 @@ export default function PlaylistPage() {
   useEffect(() => {
     async function fetchPlaylist() {
       try {
-        const res = await fetchWithAuth(`http://localhost:8080/api/v1/Playlists/${id}`);
-        const resSongs = await fetchWithAuth(`http://localhost:8080/api/v1/Playlists/${id}/songs`);
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+        const res = await fetchWithAuth(`${apiBase}/api/v1/Playlists/${id}`);
+        const resSongs = await fetchWithAuth(`${apiBase}/api/v1/Playlists/${id}/songs`);
         
         if (!res.ok) throw new Error(`Failed to fetch playlist: ${res.status}`);
         if (!resSongs.ok) throw new Error(`Failed to fetch songs: ${resSongs.status}`);
@@ -106,11 +107,12 @@ export default function PlaylistPage() {
               }
             }
             
+            const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
             return {
               id: s.id,
               title: s.name,
               album: "", // API does not provide album
-              image: "http://localhost:5039/contents/images/" + s.id,
+              image: `${contentBase}/contents/images/${s.id}`,
               author: authorName,
               dateAdded: new Date(s.releaseDate).toLocaleDateString(),
               duration: s.duration,

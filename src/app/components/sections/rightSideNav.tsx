@@ -17,7 +17,8 @@ export default function RightSideNav({ currentSong }: RightSideNavProps) {
       if (!currentSong?.id) return;
 
       try {
-        const res = await fetchWithAuth(`http://localhost:8080/api/v1/Songs/${currentSong.id}`);
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+        const res = await fetchWithAuth(`${apiBase}/api/v1/Songs/${currentSong.id}`);
         console.log(res);
         if (!res.ok) throw new Error(`Failed to fetch song: ${res.status}`);
         const json = await res.json();
@@ -31,12 +32,7 @@ export default function RightSideNav({ currentSong }: RightSideNavProps) {
     fetchSong();
   }, [currentSong?.id]);
 
-  if (!currentSong)
-    return (
-      <div className="h-full w-[300px] flex flex-col gap-2 bg-neutral-900 rounded-lg p-4 text-gray-400">
-        Select a song to show detailed info
-      </div>
-    );
+  if (!currentSong) return null;
 
   return (
     <div className="h-full w-[300px] flex flex-col gap-2 bg-neutral-900 rounded-lg p-4">

@@ -29,7 +29,8 @@ export function startTusUpload(file: File, opts?: {
   retryDelays?: number[];
   onProgress?: (bytesUploaded: number, bytesTotal: number) => void;
 }) {
-  const endpoint = "http://localhost:8080/files";
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE;
+  const endpoint = `${apiBase}/files`;
 
   // Get auth token from localStorage
   let authHeaders: Record<string, string> = {};
