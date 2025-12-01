@@ -19,6 +19,7 @@ export default function SavedEntry({ entry }: { entry: Entry }) {
         width={40}
         height={40}
         priority
+        unoptimized
         className="rounded-md border-2 aspect-square flex-none max-h-[40px] max-w-[40px]"
       />
       <div className="flex flex-col">

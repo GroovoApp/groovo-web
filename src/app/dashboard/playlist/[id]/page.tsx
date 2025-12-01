@@ -94,7 +94,7 @@ export default function PlaylistPage() {
           id: apiData.id,
           name: apiData.name,
           description: apiData.description,
-          image: "https://picsum.photos/seed/" + apiData.id + "/200/200",
+          image:"https://api.dicebear.com/9.x/shapes/svg?backgroundType=gradientLinear&backgroundColor=2e1010,bb2169&shape1Color=bb2169,f48323&shape2Color=6a1cbb,f41d1c&shape3Color=18bb29,164ef4&seed=" + apiData.id,
           creator: apiData.owners?.[0]?.name || "Unknown",
           songs: songsData.map((s: any) => {
             // Handle authors - could be array or single object
@@ -145,6 +145,7 @@ export default function PlaylistPage() {
           width={200}
           height={200}
           className="rounded-lg aspect-square"
+          unoptimized
         />
         <div className="flex flex-col gap-2">
           <h1 className="text-5xl font-bold">{playlist.name}</h1>
@@ -157,12 +158,12 @@ export default function PlaylistPage() {
             <Button
               onClick={handlePlayPlaylist}
               disabled={hasJoinedPlaylist}
-              variant="default"
+              variant="green"
               size="md"
               width="auto"
               className="px-8"
             >
-              {hasJoinedPlaylist ? '✓ Joined & Playing' : isConnected ? '▶ Join & Play' : '🔌 Connect & Play'}
+              {hasJoinedPlaylist ? 'Joined' : isConnected ? 'Join & Play' : 'Connect & Play'}
             </Button>
           </div>
         </div>

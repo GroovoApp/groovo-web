@@ -1,7 +1,7 @@
 import React from "react"
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "secondary" | "outline" | "destructive"
+  variant?: "default" | "secondary" | "outline" | "destructive" | "green"
   size?: "sm" | "md" | "lg"
   width?: "full" | "auto"
   cursor?: "pointer" | "not-allowed" | "default" | "text" | "move" | "wait" | "crosshair" | "help"
@@ -18,13 +18,14 @@ export default function Button({
 }: ButtonProps) {
 
   const baseStyles =
-    "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
+    "inline-flex items-center justify-center rounded-full font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
 
   const variantStyles = {
     default: "bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-400",
     secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:ring-gray-400",
     outline: "bg-neutral-700 text-white hover:bg-neutral-600 focus-visible:ring-neutral-500",
     destructive: "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500",
+    green: "bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-500",
   }[variant]
 
   const cursorStyles = {

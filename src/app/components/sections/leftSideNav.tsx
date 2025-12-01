@@ -54,8 +54,8 @@ export default function LeftSideNav() {
 
           const formattedEntries: Entry[] = playlists.map((p: any) => ({
             id: p.id,
-            name: p.name || p.title || "Untitled Playlist",
-            image: p.picture || p.coverArt || "https://picsum.photos/seed/" + p.id + "/40/40",
+            name: p.name || "Untitled Playlist",
+            image: "https://api.dicebear.com/9.x/shapes/svg?backgroundType=gradientLinear&backgroundColor=2e1010,bb2169&shape1Color=bb2169,f48323&shape2Color=6a1cbb,f41d1c&shape3Color=18bb29,164ef4&seed=" + p.id,
             author: p.description || "Playlist",
           }));
 
