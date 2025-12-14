@@ -3,6 +3,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import Image from "next/image";
 import TableSongElement from "@/src/app/components/ui/tableSongElement";
+import PlaylistSkeleton from "@/src/app/components/ui/playlistSkeleton";
 import SongContextMenu from "@/src/app/components/ui/songContextMenu";
 import { useParams } from "next/navigation";
 import { fetchWithAuth, addSongToPlaylist } from "@/src/app/utils/api";
@@ -158,7 +159,7 @@ export default function PlaylistPage() {
     fetchPlaylist();
   }, [id]);
 
-  if (loading) return <p className="p-8">Loading playlist...</p>;
+  if (loading) return <PlaylistSkeleton />;
   if (error) return <p className="p-8 text-red-500">{error}</p>;
   if (!playlist) return <p className="p-8">Playlist not found</p>;
 
@@ -201,11 +202,11 @@ export default function PlaylistPage() {
         <table className="w-full">
           <thead>
             <tr className="text-left border-b border-gray-700">
-              <th className="pb-2 font-light text-sm text-neutral-400">#</th>
-              <th className="pb-2 font-light text-sm text-neutral-400">Title</th>
-              <th className="pb-2 font-light text-sm text-neutral-400">Album</th>
-              <th className="pb-2 font-light text-sm text-neutral-400">Date added</th>
-              <th className="pb-2 font-light text-sm text-neutral-400">Duration</th>
+              <th className="pb-2 px-2 font-light text-sm text-neutral-400">#</th>
+              <th className="pb-2 px-2 font-light text-sm text-neutral-400">Title</th>
+              <th className="pb-2 px-2 font-light text-sm text-neutral-400">Album</th>
+              <th className="pb-2 px-2 font-light text-sm text-neutral-400">Date added</th>
+              <th className="pb-2 px-2 font-light text-sm text-neutral-400">Duration</th>
             </tr>
           </thead>
           <tbody>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { fetchUserPlaylists, createPlaylist } from "@/src/app/utils/api";
 import { useUserType, useUserId } from "@/src/app/utils/auth";
 import CreatePlaylistModal from "@/src/app/components/ui/createPlaylistModal";
+import LeftSideNavSkeleton from "./leftSideNavSkeleton";
 
 // The entry shape your UI uses
 interface Entry {
@@ -68,7 +69,7 @@ export default function LeftSideNav() {
 
   const isAuthor = userType?.toLowerCase() === "author" || userType?.toLowerCase() === "artist";
 
-  const handleCreatePlaylist = async (name: string, description: string, ownerIds: string[], picture?: string) => {
+  const handleCreatePlaylist = async (name: string, description: string, ownerIds: string[], picture?: string, isPublic: boolean = true) => {
     if (!userId) return;
     
     try {
@@ -76,7 +77,7 @@ export default function LeftSideNav() {
         name,
         description,
         picture: picture || "",
-        isPublic: true,
+        isPublic,
         isAlbum: isAuthor,
         ownerIds,
       });
@@ -91,19 +92,24 @@ export default function LeftSideNav() {
     }
   };
 
-  if (loading) return <div className="p-4 text-gray-400">Loading your library...</div>;
-  if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
-
   return (
     <div className="h-full w-[300px] flex flex-col gap-2 bg-neutral-900 rounded-lg p-4 pt-4 relative">
       <h1 className="text-md font-semibold">Your library</h1>
-      
-      {entries.length === 0 ? (
+
+      {loading ? (
+        <LeftSideNavSkeleton />
+      ) : error ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full text-sm text-red-400 bg-neutral-800/60 border border-red-500/30 rounded p-3">
+            Error: {error}
+          </div>
+        </div>
+      ) : entries.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-4">
           <div className="text-gray-400">
             <p className="font-medium">No {isAuthor ? "albums" : "playlists"} yet</p>
             <p className="text-sm mt-1">
-              {isAuthor 
+              {isAuthor
                 ? "Create your first album to organize your music"
                 : "Create a playlist to organize your favorite songs"}
             </p>
@@ -123,7 +129,6 @@ export default function LeftSideNav() {
             ))}
           </div>
 
-          {/* Create new playlist/album button */}
           <button
             onClick={() => setIsModalOpen(true)}
             className="mt-2 w-full text-center py-2 text-sm text-gray-400 hover:text-white hover:bg-neutral-800 rounded transition-colors"
@@ -133,7 +138,6 @@ export default function LeftSideNav() {
         </>
       )}
 
-      {/* Create Playlist Modal */}
       <CreatePlaylistModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -142,7 +146,6 @@ export default function LeftSideNav() {
         userId={userId}
       />
 
-      {/* Floating upload CTA — only visible for artists */}
       {isAuthor && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
           <Link

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import PlaylistCard from "@/src/app/components/ui/playlistCard";
 import { fetchPlaylistsByUser } from "@/src/app/utils/api";
 import { useUserId } from "@/src/app/utils/auth";
+import DashboardSkeleton from "@/src/app/components/ui/dashboardSkeleton";
 
 interface Playlist {
   id: string;
@@ -43,11 +44,7 @@ export default function DashboardPage() {
   }, [userId]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-400 text-lg">Loading playlists...</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {

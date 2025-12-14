@@ -6,7 +6,7 @@ import Button from "./button";
 interface CreatePlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (name: string, description: string, ownerIds: string[], picture?: string) => Promise<void>;
+  onConfirm: (name: string, description: string, ownerIds: string[], picture?: string, isPublic?: boolean) => Promise<void>;
   isAlbum?: boolean;
   userId: string | null;
 }
@@ -22,6 +22,7 @@ export default function CreatePlaylistModal({
   const [description, setDescription] = useState("");
   const [additionalOwners, setAdditionalOwners] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,10 +39,11 @@ export default function CreatePlaylistModal({
       // Always include the current user's ID first, then add any additional owners
       const ownerIds = [userId, ...additionalOwnerIds];
       
-      await onConfirm(name.trim(), description.trim(), ownerIds);
+      await onConfirm(name.trim(), description.trim(), ownerIds, undefined, isPublic);
       setName("");
       setDescription("");
       setAdditionalOwners("");
+      setIsPublic(true);
       onClose();
     } catch (error) {
       console.error("Error creating playlist:", error);
@@ -55,6 +57,7 @@ export default function CreatePlaylistModal({
       setName("");
       setDescription("");
       setAdditionalOwners("");
+        setIsPublic(true);
       onClose();
     }
   };
@@ -80,6 +83,27 @@ export default function CreatePlaylistModal({
             autoFocus
             disabled={isCreating}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Visibility</label>
+          <div className="flex items-center justify-between bg-neutral-700 rounded-lg px-4 py-2.5">
+            <span className="text-sm text-gray-200">Public</span>
+            <button
+              type="button"
+              aria-pressed={isPublic}
+              onClick={() => setIsPublic((v) => !v)}
+              disabled={isCreating}
+              className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${isPublic ? "bg-blue-600" : "bg-neutral-500"}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPublic ? "translate-x-5" : "translate-x-1"}`}
+              />
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Toggle to make the {isAlbum ? "album" : "playlist"} private.
+          </p>
         </div>
 
         <div>

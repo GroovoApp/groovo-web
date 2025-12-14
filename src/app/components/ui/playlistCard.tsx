@@ -21,8 +21,8 @@ export default function PlaylistCard({ id, name, image, description, author }: P
         <Image
           src={image}
           alt={name}
-          width={150}
-          height={150}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           unoptimized
           className="object-cover"
         />
