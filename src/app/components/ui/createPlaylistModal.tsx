@@ -9,6 +9,13 @@ interface CreatePlaylistModalProps {
   onConfirm: (name: string, description: string, ownerIds: string[], picture?: string, isPublic?: boolean) => Promise<void>;
   isAlbum?: boolean;
   userId: string | null;
+  // optional props for editing
+  isEdit?: boolean;
+  initialName?: string;
+  initialDescription?: string;
+  initialOwnerIds?: string[];
+  initialIsPublic?: boolean;
+  onDelete?: () => Promise<void>;
 }
 
 export default function CreatePlaylistModal({
@@ -17,6 +24,12 @@ export default function CreatePlaylistModal({
   onConfirm,
   isAlbum = false,
   userId,
+  isEdit = false,
+  initialName = "",
+  initialDescription = "",
+  initialOwnerIds,
+  initialIsPublic = true,
+  onDelete,
 }: CreatePlaylistModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -25,13 +38,29 @@ export default function CreatePlaylistModal({
   const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // populate fields when opening in edit mode
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(initialName || "");
+      setDescription(initialDescription || "");
+      setAdditionalOwners((initialOwnerIds || []).filter(id => id !== userId).join(","));
+      setIsPublic(initialIsPublic ?? true);
+      setError(null);
+    }
+  }, [isOpen, initialName, initialDescription, initialOwnerIds, initialIsPublic, userId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !userId) return;
+    console.log("Modal handleSubmit called");
+    if (!name.trim() || !userId) {
+      console.log("Validation failed - name or userId missing");
+      return;
+    }
 
     setIsCreating(true);
     setError(null);
     try {
+      console.log("About to call onConfirm with:", { name, description, userId, isPublic });
       // Parse comma-separated owner IDs and filter out empty strings
       const additionalOwnerIds = additionalOwners
         .split(',')
@@ -42,6 +71,7 @@ export default function CreatePlaylistModal({
       const ownerIds = [userId, ...additionalOwnerIds];
       
       await onConfirm(name.trim(), description.trim(), ownerIds, undefined, isPublic);
+      console.log("onConfirm completed successfully");
       setName("");
       setDescription("");
       setAdditionalOwners("");
@@ -152,6 +182,30 @@ export default function CreatePlaylistModal({
         </div>
 
         <div className="flex gap-3 justify-end pt-2">
+          {isEdit && onDelete && (
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!confirm("Delete this playlist? This action cannot be undone.")) return;
+                setIsCreating(true);
+                try {
+                  await onDelete();
+                  onClose();
+                } catch (err) {
+                  const e = err instanceof Error ? err.message : String(err);
+                  setError(e || "Delete failed");
+                } finally {
+                  setIsCreating(false);
+                }
+              }}
+              variant="outline"
+              width="auto"
+              size="md"
+              disabled={isCreating}
+            >
+              Delete
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleClose}
@@ -169,7 +223,7 @@ export default function CreatePlaylistModal({
             size="md"
             disabled={isCreating || !name.trim()}
           >
-            {isCreating ? "Creating..." : "Create"}
+            {isCreating ? (isEdit ? "Saving..." : "Creating...") : (isEdit ? "Save" : "Create")}
           </Button>
         </div>
       </form>

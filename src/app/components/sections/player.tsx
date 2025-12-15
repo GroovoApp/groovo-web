@@ -15,6 +15,9 @@ import {
   SpeakerXMarkIcon,
 } from "@heroicons/react/24/solid";
 import { fetchWithAuth } from "../../utils/api";
+import ReactionPicker from '@/src/app/components/ui/reactionPicker';
+import { ReactionResponse, EmojiReaction } from '@/src/app/types/emojiReaction';
+import { useFallingEmojis } from '@/src/app/contexts/FallingEmojisContext';
 
 export default function Player() {
   const {
@@ -25,6 +28,8 @@ export default function Player() {
   } = useContext(PlayerContext);
 
   const { playbackState, playSong, playPause, seek, isConnected, setPlayerControls } = useSignalR();
+  const { setOnReactionListener } = useSignalR();
+  const falling = useFallingEmojis();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -33,6 +38,8 @@ export default function Player() {
   const [volume, setVolume] = useState<number>(0.7);
   const [isSeeking, setIsSeeking] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [lastReaction, setLastReaction] = useState<ReactionResponse | null>(null);
+  
   const controlsRegistered = useRef(false);
   const lastProcessedSongId = useRef<string | null>(null);
   const lastIsPlayingState = useRef<boolean>(false);
@@ -107,7 +114,7 @@ export default function Player() {
     if (!isSeeking) {
       const timeDiff = Math.abs(audioRef.current.currentTime - playbackState.currentPosition);
       // Only seek if difference is significant to avoid jitter
-      if (timeDiff > 1) {
+      if (timeDiff > 0.3) {
         audioRef.current.currentTime = playbackState.currentPosition;
         setCurrentTime(playbackState.currentPosition);
       }
@@ -312,6 +319,27 @@ export default function Player() {
     };
   }, [isConnected, isPlaying]);
 
+  // Listen for incoming reactions and show briefly
+  useEffect(() => {
+    setOnReactionListener((r: ReactionResponse) => {
+      try {
+        setLastReaction(r);
+        try {
+          // trigger falling emojis for received reaction via global provider
+          falling.burst(r.reaction, Math.floor(Math.random() * (30 - 10 + 1)) + 10);
+        } catch (err) { console.error('Falling effect error', err); }
+        // Clear after 3s
+        setTimeout(() => setLastReaction(null), 3000);
+      } catch (err) {
+        console.error('Reaction listener error', err);
+      }
+    });
+    return () => setOnReactionListener(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  
+
   if (!currentSong) return null;
 
   const togglePlay = async () => {
@@ -364,13 +392,11 @@ export default function Player() {
   };
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-6xl bg-neutral-800 border border-neutral-700 rounded-lg shadow-2xl px-4 overflow-hidden">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-6xl bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl px-4 overflow-visible">
       <audio ref={audioRef} />
-      {/* Hidden audio element for preloading next song */}
       <audio ref={nextAudioRef} style={{ display: 'none' }} />
 
       <div className="flex items-center justify-between py-3 gap-4">
-        {/* Left: Song Info */}
         <div className="flex items-center gap-3 min-w-0 flex-1 pl-2">
           <Image
             src={currentSong.image}
@@ -383,10 +409,26 @@ export default function Player() {
             <p className="font-semibold text-white truncate">{currentSong.title}</p>
             <p className="text-sm text-gray-400 truncate">{currentSong.author}</p>
           </div>
+          {/* lastReaction display removed — no longer needed */}
         </div>
 
-        {/* Center: Controls */}
         <div className="flex flex-col items-center gap-2 flex-1">
+          <div className="relative mb-1">
+            <div className="absolute left-1/2 -translate-x-1/2 -top-20 z-[9999] pointer-events-auto">
+              <ReactionPicker
+                songId={playbackState?.currentSongId ?? null}
+                onReact={(r) => {
+                  try {
+                    setLastReaction(r);
+                    falling.burst(r.reaction, Math.floor(Math.random() * (30 - 10 + 1)) + 10);
+                    setTimeout(() => setLastReaction(null), 3000);
+                  } catch (err) {
+                    console.error('Error showing local reaction', err);
+                  }
+                }}
+              />
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={togglePlay}
@@ -415,7 +457,6 @@ export default function Player() {
 
           </div>
 
-          {/* Progress Bar */}
           <div className="w-full max-w-md flex items-center gap-2">
             <span className="text-xs text-gray-400 w-10 text-right">
               {formatTime(currentTime)}

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import DashboardSkeleton from "@/src/app/components/ui/dashboardSkeleton";
 import PlaylistCard from "@/src/app/components/ui/playlistCard";
-import { fetchPlaylistsByUser } from "@/src/app/utils/api";
+import { fetchPublicPlaylists } from "@/src/app/utils/api";
 
 export default function UserDashboardPage() {
   const [playlists, setPlaylists] = useState<any[]>([]);
@@ -14,7 +14,7 @@ export default function UserDashboardPage() {
     const loadPlaylists = async () => {
       try {
         setIsLoading(true);
-        const data = await fetchPlaylistsByUser('');
+        const data = await fetchPublicPlaylists();
         setPlaylists(data || []);
       } catch (err) {
         console.error('Failed to load playlists:', err);
@@ -40,12 +40,13 @@ export default function UserDashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {playlists.map((playlist) => (
                 <PlaylistCard
+                  userType="user"
                   key={playlist.id}
                   id={playlist.id}
                   name={playlist.name}
-                  image={playlist.coverImageUrl || '/placeholder.jpg'}
+                  image={"https://api.dicebear.com/9.x/shapes/svg?backgroundType=gradientLinear&backgroundColor=2e1010,bb2169&shape1Color=bb2169,f48323&shape2Color=6a1cbb,f41d1c&shape3Color=18bb29,164ef4&seed=" + playlist.id}
                   description={playlist.description}
-                  author={playlist.author || 'Unknown'}
+                  author={playlist.owners?.length ? playlist.owners.map((owner: any) => owner.name).join(', ') : 'Unknown'}
                 />
               ))}
             </div>

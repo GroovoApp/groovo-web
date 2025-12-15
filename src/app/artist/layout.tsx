@@ -36,11 +36,14 @@ export default function ArtistLayout({ children }: { children: React.ReactNode }
   const playerHeight = currentSong ? 120 : 0;
 
   useEffect(() => {
-    if (!isCheckingAuth && userType && userType.toLowerCase() !== "author") {
-      if (userType.toLowerCase() === "user") {
-        router.replace("/user");
-      } else {
-        router.replace("/auth/login");
+    if (!isCheckingAuth) {
+      const typeStr = userType ? String(userType).toLowerCase() : null;
+      if (typeStr && typeStr !== "author") {
+        if (typeStr === "user") {
+          router.replace("/user");
+        } else {
+          router.replace("/auth/login");
+        }
       }
     }
   }, [isCheckingAuth, userType, router]);

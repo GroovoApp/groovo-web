@@ -20,6 +20,7 @@ export default function ArtistLeftSideNav() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const userId = useUserId();
   const router = useRouter();
 
@@ -56,13 +57,31 @@ export default function ArtistLeftSideNav() {
     }
 
     fetchData();
-  }, [userId]);
+  }, [userId, refreshTrigger]);
+
+  // Refresh when playlists changed elsewhere
+  useEffect(() => {
+    const handler = () => setRefreshTrigger((v) => v + 1);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('playlists:changed', handler as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('playlists:changed', handler as EventListener);
+      }
+    };
+  }, []);
 
   const handleCreateAlbum = async (name: string, description: string, ownerIds: string[], picture?: string, isPublic: boolean = true) => {
-    if (!userId) return;
+    console.log("handleCreateAlbum called with:", { name, description, ownerIds, isPublic, isAlbum: true });
+    if (!userId) {
+      console.log("No userId!");
+      return;
+    }
     
     try {
-      const newAlbum = await createPlaylist({
+      console.log("Creating playlist...");
+      const response = await createPlaylist({
         name,
         description,
         picture: picture || "",
@@ -71,12 +90,12 @@ export default function ArtistLeftSideNav() {
         ownerIds,
       });
       
-      if (newAlbum?.id) {
-        router.push(`/artist/playlist/${newAlbum.id}`);
-      }
+      console.log("Playlist created successfully:", response);
+      console.log("Refreshing left side nav...");
+      setRefreshTrigger((prev) => prev + 1);
     } catch (err: any) {
+      console.error("Error creating album:", err);
       setError(err.message);
-      throw err;
     }
   };
 

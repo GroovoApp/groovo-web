@@ -18,12 +18,15 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (isAuthValid()) {
-      const type = getUserType()?.toLowerCase()
-      if (type === 'artist') {
-        router.push('/artist/dashboard')
-      } else {
-        router.push('/user/dashboard')
+      const checkUserType = async () => {
+        const type = await getUserType();
+        if (type?.toLowerCase() === 'artist') {
+          router.push('/artist/dashboard')
+        } else {
+          router.push('/user/dashboard')
+        }
       }
+      checkUserType();
     }
   }, [router])
 
@@ -60,8 +63,8 @@ export default function RegisterPage() {
         console.warn('No accessToken returned from register endpoint', responseData);
       }
 
-      const type = getUserType()?.toLowerCase()
-      if (type === 'artist') {
+      const type = await getUserType();
+      if (type?.toLowerCase() === 'artist') {
         router.push('/artist/dashboard')
       } else {
         router.push('/user/dashboard')

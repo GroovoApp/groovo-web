@@ -21,6 +21,7 @@ export default function LeftSideNav() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const userType = useUserType();
   const userId = useUserId();
   const router = useRouter();
@@ -65,7 +66,20 @@ export default function LeftSideNav() {
     }
 
     fetchData();
-  }, [userId, userType]);
+  }, [userId, userType, refreshTrigger]);
+
+  // Listen for external playlist changes and refresh
+  useEffect(() => {
+    const handler = () => setRefreshTrigger((v) => v + 1);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('playlists:changed', handler as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('playlists:changed', handler as EventListener);
+      }
+    };
+  }, []);
 
   const isAuthor = userType?.toLowerCase() === "author" || userType?.toLowerCase() === "artist";
 
@@ -82,9 +96,9 @@ export default function LeftSideNav() {
         ownerIds,
       });
       
-      // Redirect to the newly created playlist page
       if (newPlaylist?.id) {
-        router.push(`/dashboard/playlist/${newPlaylist.id}`);
+        // Reload the page to refresh the left side nav
+        window.location.reload();
       }
     } catch (err: any) {
       setError(err.message);
@@ -97,7 +111,9 @@ export default function LeftSideNav() {
       <h1 className="text-md font-semibold">Your library</h1>
 
       {loading ? (
-        <LeftSideNavSkeleton />
+        <div className="flex-1 min-h-0 flex flex-col gap-2">
+          <LeftSideNavSkeleton />
+        </div>
       ) : error ? (
         <div className="flex-1 min-h-0 flex items-center justify-center">
           <div className="w-full text-sm text-red-400 bg-neutral-800/60 border border-red-500/30 rounded p-3">

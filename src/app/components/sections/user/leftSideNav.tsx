@@ -19,6 +19,7 @@ export default function UserLeftSideNav() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const userId = useUserId();
   const router = useRouter();
 
@@ -55,13 +56,31 @@ export default function UserLeftSideNav() {
     }
 
     fetchData();
-  }, [userId]);
+  }, [userId, refreshTrigger]);
+
+  // Refresh when playlists changed elsewhere
+  useEffect(() => {
+    const handler = () => setRefreshTrigger((v) => v + 1);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('playlists:changed', handler as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('playlists:changed', handler as EventListener);
+      }
+    };
+  }, []);
 
   const handleCreatePlaylist = async (name: string, description: string, ownerIds: string[], picture?: string, isPublic: boolean = true) => {
-    if (!userId) return;
+    console.log("handleCreatePlaylist called");
+    if (!userId) {
+      console.log("No userId");
+      return;
+    }
     
     try {
-      const newPlaylist = await createPlaylist({
+      console.log("Creating playlist with:", { name, description, isAlbum: false });
+      const response = await createPlaylist({
         name,
         description,
         picture: picture || "",
@@ -70,14 +89,14 @@ export default function UserLeftSideNav() {
         ownerIds,
       });
       
-      if (newPlaylist?.id) {
-        router.push(`/user/playlist/${newPlaylist.id}`);
-      }
+      console.log("Response:", response);
+      console.log("Playlist created successfully, refreshing left side nav...");
+      setRefreshTrigger((prev) => prev + 1);
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const message = errorMessage || "Failed to create playlist";
+      console.error("Error creating playlist:", err);
       toast.error(message);
-      throw err;
     }
   };
 
