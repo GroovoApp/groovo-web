@@ -2,7 +2,7 @@
 
 import React, { useContext, useRef, useEffect, useState } from "react";
 import Image from "next/image";
-import { PlayerContext } from "@/src/app/dashboard/layout";
+import { PlayerContext } from "@/src/app/user/layout";
 import { useSignalR } from "@/src/app/contexts/SignalRContext";
 import {
   PlayIcon,

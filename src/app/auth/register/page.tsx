@@ -5,7 +5,7 @@ import Input from '@/src/app/components/ui/input'
 import Link from '@/src/app/components/ui/link'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { isAuthValid } from '@/src/app/utils/auth'
+import { isAuthValid, getUserType } from '@/src/app/utils/auth'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -18,7 +18,12 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (isAuthValid()) {
-      router.push('/dashboard')
+      const type = getUserType()?.toLowerCase()
+      if (type === 'artist') {
+        router.push('/artist/dashboard')
+      } else {
+        router.push('/user/dashboard')
+      }
     }
   }, [router])
 
@@ -55,7 +60,12 @@ export default function RegisterPage() {
         console.warn('No accessToken returned from register endpoint', responseData);
       }
 
-      router.push('/dashboard');
+      const type = getUserType()?.toLowerCase()
+      if (type === 'artist') {
+        router.push('/artist/dashboard')
+      } else {
+        router.push('/user/dashboard')
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

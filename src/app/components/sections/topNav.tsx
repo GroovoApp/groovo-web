@@ -43,7 +43,7 @@ export default function TopNav() {
       <div className="flex items-center justify-between w-full">
         {/* Left: logo */}
         <div className="flex items-center gap-3">
-          <Link href="/dashboard">
+          <Link href="/user">
             <Image
               src="/Groovo.svg"
               alt="Groovo Logo"
@@ -102,7 +102,7 @@ export default function TopNav() {
           {open && (
             <div className="absolute right-0 mt-2 w-48 bg-neutral-900 rounded-md shadow-lg py-1 z-20">
               <a
-                href="/dashboard"
+                href="/user"
                 className="block px-4 py-2 text-sm hover:bg-neutral-800"
                 onClick={() => setOpen(false)}
               >

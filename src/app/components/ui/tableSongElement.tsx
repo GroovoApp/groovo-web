@@ -2,7 +2,7 @@
 import React, { useContext } from "react";
 import Image from "next/image";
 import { Song } from "@/src/app/types/song"; // adjust path
-import { CurrentSongContext } from "@/src/app/dashboard/layout";
+import { PlayerContext } from "@/src/app/user/layout";
 import { useSignalR } from "@/src/app/contexts/SignalRContext";
 
 type Props = {
@@ -12,7 +12,7 @@ type Props = {
 };
 
 export default function TableSongElement({ song, index, onContextMenu }: Props) {
-  const { setCurrentSong } = useContext(CurrentSongContext);
+  const { setCurrentSong } = useContext(PlayerContext);
   const { playSong, isConnected } = useSignalR();
 
   const handlePlaySong = async () => {

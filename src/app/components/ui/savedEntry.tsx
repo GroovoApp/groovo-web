@@ -10,9 +10,18 @@ type Entry = {
   author?: string;
 };
 
-export default function SavedEntry({ entry }: { entry: Entry }) {
+type SavedEntryProps = {
+  entry: Entry;
+  isAlbum?: boolean;
+  basePath?: string;
+};
+
+export default function SavedEntry({ entry, isAlbum = false, basePath = "/user" }: SavedEntryProps) {
+  const href = `${basePath}/playlist/${entry.id}`;
+  const itemType = isAlbum ? "Album" : "Playlist";
+
   return (
-    <Link href={"/dashboard/playlist/" + entry.id} className="p-2 flex gap-3 rounded-md hover:bg-neutral-800 transition-colors duration-200 ease-in-out cursor-pointer items-center">
+    <Link href={href} className="p-2 flex gap-3 rounded-md hover:bg-neutral-800 transition-colors duration-200 ease-in-out cursor-pointer items-center">
       <Image
         src={entry.image}
         alt={entry.name}
@@ -25,7 +34,7 @@ export default function SavedEntry({ entry }: { entry: Entry }) {
       <div className="flex flex-col">
         <h3 className="text-sm font-medium text-white">{entry.name}</h3>
         <p className="text-xs text-gray-400">
-          Playlist by {entry.author || "Unknown"}
+          {itemType} by {entry.author || "Unknown"}
         </p>
       </div>
     </Link>

@@ -7,9 +7,8 @@ import PlaylistSkeleton from "@/src/app/components/ui/playlistSkeleton";
 import SongContextMenu from "@/src/app/components/ui/songContextMenu";
 import { useParams } from "next/navigation";
 import { fetchWithAuth, addSongToPlaylist } from "@/src/app/utils/api";
-import { useSignalR } from "@/src/app/contexts/SignalRContext";
 import Button from "@/src/app/components/ui/button";
-import { PlayerContext } from "@/src/app/dashboard/layout";
+import { PlayerContext } from "@/src/app/artist/layout";
 
 type Song = {
   id: string;
@@ -33,42 +32,21 @@ type Playlist = {
 export default function PlaylistPage() {
   const params = useParams();
   const { id } = params;
-  const { connect, joinPlaylist, leavePlaylist, getPlaybackState, isConnected, playSong, playbackState, setPlaylistSongs } = useSignalR();
   const { setCurrentSong } = useContext(PlayerContext);
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; songId: string } | null>(null);
   const [addedStatus, setAddedStatus] = useState<{ playlistId: string; success: boolean } | null>(null);
-
-  const [hasJoinedPlaylist, setHasJoinedPlaylist] = useState(false);
 
   const handlePlayPlaylist = async () => {
     if (!id || !playlist) return;
     
     try {
-      // Connect to SignalR if not already connected
-      if (!isConnected) {
-        await connect();
-      }
-      
-      // Set the playlist songs in the context
-      const songIds = playlist.songs.map(song => song.id);
-      setPlaylistSongs(songIds);
-      
       // Open the player by setting the first song
       if (playlist.songs.length > 0) {
         setCurrentSong(playlist.songs[0] as any);
       }
-      
-      // Join the playlist
-      await joinPlaylist(id as string);
-      setHasJoinedPlaylist(true);
-      
-      // Get current playback state
-      await getPlaybackState();
-      
     } catch (err) {
       // Error handling can be added here if needed
     }
@@ -150,7 +128,7 @@ export default function PlaylistPage() {
 
         setPlaylist(mappedPlaylist);
       } catch (err: any) {
-        setError(err.message || "An error occurred");
+        console.error("Failed to fetch playlist:", err);
       } finally {
         setLoading(false);
       }
@@ -160,7 +138,6 @@ export default function PlaylistPage() {
   }, [id]);
 
   if (loading) return <PlaylistSkeleton />;
-  if (error) return <p className="p-8 text-red-500">{error}</p>;
   if (!playlist) return <p className="p-8">Playlist not found</p>;
 
   return (
@@ -185,13 +162,12 @@ export default function PlaylistPage() {
           <div className="mt-4">
             <Button
               onClick={handlePlayPlaylist}
-              disabled={hasJoinedPlaylist}
               variant="green"
               size="md"
               width="auto"
               className="px-8"
             >
-              {hasJoinedPlaylist ? 'Joined' : isConnected ? 'Join & Play' : 'Connect & Play'}
+              Play
             </Button>
           </div>
         </div>

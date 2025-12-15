@@ -23,12 +23,14 @@ export default function CreatePlaylistModal({
   const [additionalOwners, setAdditionalOwners] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !userId) return;
 
     setIsCreating(true);
+    setError(null);
     try {
       // Parse comma-separated owner IDs and filter out empty strings
       const additionalOwnerIds = additionalOwners
@@ -44,9 +46,12 @@ export default function CreatePlaylistModal({
       setDescription("");
       setAdditionalOwners("");
       setIsPublic(true);
+      setError(null);
       onClose();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error creating playlist:", error);
+      setError(errorMessage || "Failed to create playlist");
     } finally {
       setIsCreating(false);
     }
@@ -57,7 +62,8 @@ export default function CreatePlaylistModal({
       setName("");
       setDescription("");
       setAdditionalOwners("");
-        setIsPublic(true);
+      setIsPublic(true);
+      setError(null);
       onClose();
     }
   };
@@ -69,6 +75,12 @@ export default function CreatePlaylistModal({
       title={`Create ${isAlbum ? "Album" : "Playlist"}`}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
+        {error && (
+          <div className="px-4 py-3 bg-red-500/10 border border-red-500/50 rounded-lg text-sm text-red-400">
+            {error}
+          </div>
+        )}
+        
         <div>
           <label htmlFor="playlist-name" className="block text-sm font-medium mb-2">
             Name

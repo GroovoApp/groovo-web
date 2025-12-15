@@ -40,7 +40,7 @@ export default function UploadPage() {
   useEffect(() => {
     // Only allow artists to access this page
     if (userType && userType.toLowerCase() !== "author") {
-      router.push("/dashboard");
+      router.push("/artist/dashboard");
     }
   }, [userType, router]);
 

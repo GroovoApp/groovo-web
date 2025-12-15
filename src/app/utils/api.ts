@@ -77,6 +77,27 @@ export async function fetchPlaylistsByUser(userId: string) {
   return res.json().catch(() => []);
 }
 
+export async function fetchPublicPlaylists() {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/Playlists`;
+
+  console.log("Fetching public playlists from:", url);
+
+  const res = await fetchWithAuth(url, {
+    method: 'GET',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    console.error("Error fetching public playlists:", text);
+    throw new Error(`Fetch public playlists failed: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  const data = await res.json().catch(() => []);
+  console.log("Public playlists data received:", data);
+  return data;
+}
+
 export async function fetchUserPlaylists(userId: string) {
   const base = process.env.NEXT_PUBLIC_API_BASE;
   const url = `${base}/api/v1/users/${userId}/playlists`;
@@ -106,20 +127,30 @@ export async function createPlaylist(payload: any) {
 
   console.log("Creating playlist with payload:", payload);
 
-  const res = await fetchWithAuth(url, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  try {
+    const res = await fetchWithAuth(url, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => null);
-    console.error("Create playlist error:", text);
-    throw new Error(`Create playlist failed: ${res.status} ${res.statusText} ${text || ''}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => null);
+      const errorMessage = text ? `${res.status} ${res.statusText}: ${text}` : `${res.status} ${res.statusText}`;
+      console.error("Create playlist error:", errorMessage);
+      throw new Error(`Create playlist failed: ${errorMessage}`);
+    }
+
+    const data = await res.json().catch(() => null);
+    console.log("Playlist created:", data);
+    return data;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error("Create playlist exception:", error.message);
+      throw error;
+    }
+    console.error("Create playlist unknown error:", error);
+    throw new Error(`Create playlist failed: Unknown error ${String(error)}`);
   }
-
-  const data = await res.json().catch(() => null);
-  console.log("Playlist created:", data);
-  return data;
 }
 
 export async function addSongToPlaylist(playlistId: string, songId: string) {

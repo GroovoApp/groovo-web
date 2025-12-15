@@ -13,7 +13,7 @@ type PlaylistCardProps = {
 export default function PlaylistCard({ id, name, image, description, author }: PlaylistCardProps) {
   return (
     <Link 
-      href={`/dashboard/playlist/${id}`}
+      href={`/user/playlist/${id}`}
       className="group relative bg-neutral-900 hover:bg-neutral-800 p-2 rounded-lg transition-all duration-300 ease-in-out cursor-pointer"
     >
       {/* Playlist Cover */}

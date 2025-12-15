@@ -5,10 +5,10 @@ import Skeleton from "../ui/skeleton";
 
 export default function LeftSideNavSkeleton() {
   return (
-    <div className="h-full w-[300px] flex flex-col gap-2 bg-neutral-900 rounded-lg p-4 pt-4">
+    <div className="h-full w-[300px] flex flex-col gap-2 bg-neutral-900 rounded-lg p-4 pt-4 overflow-hidden">
       <Skeleton className="h-5 w-32" />
 
-      <div className="mt-2 flex flex-col gap-2">
+      <div className="mt-2 flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3 p-2 rounded">
             <Skeleton className="h-12 w-12 rounded" />
