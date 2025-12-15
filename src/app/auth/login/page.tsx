@@ -3,6 +3,7 @@
 import Button from '@/src/app/components/ui/button'
 import Input from '@/src/app/components/ui/input'
 import Link from '@/src/app/components/ui/link'
+import Image from 'next/image'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { isAuthValid } from '@/src/app/utils/auth'
@@ -63,17 +64,20 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-900 p-6">
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#12030a] to-[#1a0510] p-6">
       <form
-        className="flex flex-col bg-white gap-6 w-full max-w-md rounded-xl p-6 shadow-[0_10px_30px_rgba(2,6,23,0.5)]"
+        className="flex flex-col bg-white gap-6 w-full max-w-md rounded-2xl p-8 shadow-[0_20px_60px_rgba(187,33,105,0.4)] border border-[#bb2169]/20"
         onSubmit={handleSubmit}
         aria-label="Login form"
       >
-        <h1 className="text-2xl font-bold text-slate-900">Sign in</h1>
+        <div className="flex justify-center mb-2">
+          <Image src="/Groovo-red-black.svg" alt="Groovo" width={150} height={50} className="h-12 w-auto" />
+        </div>
+        <h1 className="font-display text-3xl font-bold text-gray-900 text-center mb-2">Sign in</h1>
 
-        {error && <p className="text-red-500">{error}</p>}
+        {error && <p className="text-red-600 bg-red-50 p-3 rounded-lg text-sm">{error}</p>}
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4">
           <Input
             label="Email"
             id="email"
@@ -95,12 +99,12 @@ export default function LoginPage() {
           />
         </div>
 
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} className="!bg-[#bb2169] hover:!bg-[#a01d5c] !text-white mt-2">
           {loading ? 'Logging in...' : 'Login'}
         </Button>
 
-        <div className="mt-3 text-sm text-slate-500 text-center">
-          Don't have an account? <Link underlined href="/auth/register">Create one now!</Link>
+        <div className="mt-2 text-sm text-gray-600 text-center">
+          Don't have an account? <Link underlined href="/auth/register" className="!text-[#bb2169] hover:!text-[#a01d5c] font-semibold">Create one now!</Link>
         </div>
       </form>
     </main>
