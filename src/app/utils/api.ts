@@ -1,4 +1,44 @@
-export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+export async function refreshAccessToken() {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/auth/refresh`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => null);
+      throw new Error(`Refresh failed: ${res.status} ${res.statusText} ${text || ''}`);
+    }
+
+    const data = await res.json().catch(() => null);
+    const newAccessToken = data?.data?.AccessToken;
+
+    if (newAccessToken) {
+      localStorage.setItem('accessToken', newAccessToken);
+      return { success: true, accessToken: newAccessToken };
+    } else {
+      throw new Error('No access token in refresh response');
+    }
+  } catch (error) {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('accessToken');
+      } catch (err) {
+        console.warn('Could not clear accessToken from localStorage', err);
+      }
+    }
+    console.error('Token refresh failed:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function fetchWithAuth(url: string, options: RequestInit = {}, isRetry: boolean = false) {
   let authHeader: Record<string, string> = {}
   try {
     if (typeof window !== 'undefined') {
@@ -19,12 +59,24 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     },
   });
 
-  // if (res.status === 401 || res.status === 403) {
-  //   window.location.href = '/auth/login';
-  //   return res;
-  // }
+  console.debug('fetchWithAuth ->', { url, status: res.status, statusText: res.statusText });
 
-  return res; // Return the raw Response object
+  // Handle 401 Unauthorized - attempt token refresh and retry
+  if (res.status === 401 && !isRetry) {
+    console.log('Received 401, attempting token refresh...');
+    const refreshResult = await refreshAccessToken();
+
+    if (refreshResult.success) {
+      console.log('Token refreshed successfully, retrying original request');
+      return fetchWithAuth(url, options, true);
+    } else {
+      console.error('Token refresh failed');
+      // Throw so callers can handle redirect logic instead of forcing it here
+      throw new Error('Token refresh failed');
+    }
+  }
+
+  return res;
 }
 
 export async function createSong(payload: any) {
@@ -77,6 +129,28 @@ export async function fetchPlaylistsByUser(userId: string) {
   return res.json().catch(() => []);
 }
 
+export async function fetchPublicPlaylists() {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/Playlists`;
+
+  console.log("Fetching public playlists from:", url);
+
+  const res = await fetchWithAuth(url, {
+    method: 'GET',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    console.error("Error fetching public playlists:", res.status, res.statusText, text);
+    // Return empty list on non-authorized / error to avoid breaking the UI.
+    return [];
+  }
+
+  const data = await res.json().catch(() => null);
+  console.log("Public playlists data received:", data);
+  return data?.data || data || [];
+}
+
 export async function fetchUserPlaylists(userId: string) {
   const base = process.env.NEXT_PUBLIC_API_BASE;
   const url = `${base}/api/v1/users/${userId}/playlists`;
@@ -106,20 +180,63 @@ export async function createPlaylist(payload: any) {
 
   console.log("Creating playlist with payload:", payload);
 
+  try {
+    const res = await fetchWithAuth(url, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => null);
+      const errorMessage = text ? `${res.status} ${res.statusText}: ${text}` : `${res.status} ${res.statusText}`;
+      console.error("Create playlist error:", errorMessage);
+      throw new Error(`Create playlist failed: ${errorMessage}`);
+    }
+
+    const data = await res.json().catch(() => null);
+    console.log("Playlist created:", data);
+    return data;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error("Create playlist exception:", error.message);
+      throw error;
+    }
+    console.error("Create playlist unknown error:", error);
+    throw new Error(`Create playlist failed: Unknown error ${String(error)}`);
+  }
+}
+
+export async function updatePlaylist(playlistId: string, payload: any) {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/Playlists/${playlistId}`;
+
   const res = await fetchWithAuth(url, {
-    method: 'POST',
+    method: 'PUT',
     body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => null);
-    console.error("Create playlist error:", text);
-    throw new Error(`Create playlist failed: ${res.status} ${res.statusText} ${text || ''}`);
+    throw new Error(`Update playlist failed: ${res.status} ${res.statusText} ${text || ''}`);
   }
 
-  const data = await res.json().catch(() => null);
-  console.log("Playlist created:", data);
-  return data;
+  return res.json().catch(() => null);
+}
+
+export async function deletePlaylist(playlistId: string) {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const url = `${base}/api/v1/Playlists/${playlistId}`;
+
+  const res = await fetchWithAuth(url, {
+    method: 'DELETE',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    throw new Error(`Delete playlist failed: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  return true;
 }
 
 export async function addSongToPlaylist(playlistId: string, songId: string) {
@@ -140,4 +257,56 @@ export async function addSongToPlaylist(playlistId: string, songId: string) {
 
   console.log("Song added to playlist successfully");
   return res.ok;
+}
+
+export async function fetchUserInfo() {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const res = await fetchWithAuth(`${base}/api/v1/auth/me`, {
+    method: 'GET',
+  });
+
+  console.debug('fetchUserInfo status:', res.status, res.statusText);
+  const text = await res.text().catch(() => null);
+  console.debug('fetchUserInfo body:', text);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch user information: ${res.status} ${res.statusText} ${text || ''}`);
+  }
+
+  if (!text) {
+    console.warn('Empty response from server');
+    return null;
+  }
+
+  try {
+    const data = JSON.parse(text);
+    return data?.data || data;
+  } catch (err) {
+    console.warn('Could not parse /auth/me JSON', err, text);
+    return null;
+  }
+}
+
+export async function updateUserInfo(userInfo: { name: string; bio: string }) {
+  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const res = await fetchWithAuth(`${base}/api/v1/auth/me`, {
+    method: 'PUT',
+    body: JSON.stringify(userInfo),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error');
+    throw new Error(`Failed to update user info: ${errorText}`);
+  }
+
+  const text = await res.text();
+  if (text) {
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.warn('Response was not valid JSON');
+      return null;
+    }
+  }
+
+  return null;
 }

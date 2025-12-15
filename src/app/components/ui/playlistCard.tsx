@@ -8,12 +8,13 @@ type PlaylistCardProps = {
   image: string;
   description?: string;
   author?: string;
+  userType: "user" | "artist";
 };
 
-export default function PlaylistCard({ id, name, image, description, author }: PlaylistCardProps) {
+export default function PlaylistCard({ id, name, image, description, author, userType }: PlaylistCardProps) {
   return (
     <Link 
-      href={`/dashboard/playlist/${id}`}
+      href={`/${userType}/playlist/${id}`}
       className="group relative bg-neutral-900 hover:bg-neutral-800 p-2 rounded-lg transition-all duration-300 ease-in-out cursor-pointer"
     >
       {/* Playlist Cover */}
@@ -21,8 +22,8 @@ export default function PlaylistCard({ id, name, image, description, author }: P
         <Image
           src={image}
           alt={name}
-          width={150}
-          height={150}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           unoptimized
           className="object-cover"
         />

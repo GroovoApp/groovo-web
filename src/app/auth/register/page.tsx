@@ -8,7 +8,7 @@ import { Label } from '@/src/app/components/ui/label'
 import Image from 'next/image'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { isAuthValid } from '@/src/app/utils/auth'
+import { isAuthValid, getUserType } from '@/src/app/utils/auth'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -21,7 +21,15 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (isAuthValid()) {
-      router.push('/dashboard')
+      const checkUserType = async () => {
+        const type = await getUserType();
+        if (type?.toLowerCase() === 'artist') {
+          router.push('/artist/dashboard')
+        } else {
+          router.push('/user/dashboard')
+        }
+      }
+      checkUserType();
     }
   }, [router])
 
@@ -58,7 +66,12 @@ export default function RegisterPage() {
         console.warn('No accessToken returned from register endpoint', responseData);
       }
 
-      router.push('/dashboard');
+      const type = await getUserType();
+      if (type?.toLowerCase() === 'artist') {
+        router.push('/artist/dashboard')
+      } else {
+        router.push('/user/dashboard')
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

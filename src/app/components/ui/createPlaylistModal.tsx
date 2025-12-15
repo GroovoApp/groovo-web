@@ -6,9 +6,16 @@ import Button from "./button";
 interface CreatePlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (name: string, description: string, ownerIds: string[], picture?: string) => Promise<void>;
+  onConfirm: (name: string, description: string, ownerIds: string[], picture?: string, isPublic?: boolean) => Promise<void>;
   isAlbum?: boolean;
   userId: string | null;
+  // optional props for editing
+  isEdit?: boolean;
+  initialName?: string;
+  initialDescription?: string;
+  initialOwnerIds?: string[];
+  initialIsPublic?: boolean;
+  onDelete?: () => Promise<void>;
 }
 
 export default function CreatePlaylistModal({
@@ -17,18 +24,43 @@ export default function CreatePlaylistModal({
   onConfirm,
   isAlbum = false,
   userId,
+  isEdit = false,
+  initialName = "",
+  initialDescription = "",
+  initialOwnerIds,
+  initialIsPublic = true,
+  onDelete,
 }: CreatePlaylistModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [additionalOwners, setAdditionalOwners] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // populate fields when opening in edit mode
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(initialName || "");
+      setDescription(initialDescription || "");
+      setAdditionalOwners((initialOwnerIds || []).filter(id => id !== userId).join(","));
+      setIsPublic(initialIsPublic ?? true);
+      setError(null);
+    }
+  }, [isOpen, initialName, initialDescription, initialOwnerIds, initialIsPublic, userId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !userId) return;
+    console.log("Modal handleSubmit called");
+    if (!name.trim() || !userId) {
+      console.log("Validation failed - name or userId missing");
+      return;
+    }
 
     setIsCreating(true);
+    setError(null);
     try {
+      console.log("About to call onConfirm with:", { name, description, userId, isPublic });
       // Parse comma-separated owner IDs and filter out empty strings
       const additionalOwnerIds = additionalOwners
         .split(',')
@@ -38,13 +70,18 @@ export default function CreatePlaylistModal({
       // Always include the current user's ID first, then add any additional owners
       const ownerIds = [userId, ...additionalOwnerIds];
       
-      await onConfirm(name.trim(), description.trim(), ownerIds);
+      await onConfirm(name.trim(), description.trim(), ownerIds, undefined, isPublic);
+      console.log("onConfirm completed successfully");
       setName("");
       setDescription("");
       setAdditionalOwners("");
+      setIsPublic(true);
+      setError(null);
       onClose();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error creating playlist:", error);
+      setError(errorMessage || "Failed to create playlist");
     } finally {
       setIsCreating(false);
     }
@@ -55,6 +92,8 @@ export default function CreatePlaylistModal({
       setName("");
       setDescription("");
       setAdditionalOwners("");
+      setIsPublic(true);
+      setError(null);
       onClose();
     }
   };
@@ -66,6 +105,12 @@ export default function CreatePlaylistModal({
       title={`Create ${isAlbum ? "Album" : "Playlist"}`}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
+        {error && (
+          <div className="px-4 py-3 bg-red-500/10 border border-red-500/50 rounded-lg text-sm text-red-400">
+            {error}
+          </div>
+        )}
+        
         <div>
           <label htmlFor="playlist-name" className="block text-sm font-medium mb-2">
             Name
@@ -80,6 +125,27 @@ export default function CreatePlaylistModal({
             autoFocus
             disabled={isCreating}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Visibility</label>
+          <div className="flex items-center justify-between bg-neutral-700 rounded-lg px-4 py-2.5">
+            <span className="text-sm text-gray-200">Public</span>
+            <button
+              type="button"
+              aria-pressed={isPublic}
+              onClick={() => setIsPublic((v) => !v)}
+              disabled={isCreating}
+              className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${isPublic ? "bg-blue-600" : "bg-neutral-500"}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPublic ? "translate-x-5" : "translate-x-1"}`}
+              />
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Toggle to make the {isAlbum ? "album" : "playlist"} private.
+          </p>
         </div>
 
         <div>
@@ -116,6 +182,30 @@ export default function CreatePlaylistModal({
         </div>
 
         <div className="flex gap-3 justify-end pt-2">
+          {isEdit && onDelete && (
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!confirm("Delete this playlist? This action cannot be undone.")) return;
+                setIsCreating(true);
+                try {
+                  await onDelete();
+                  onClose();
+                } catch (err) {
+                  const e = err instanceof Error ? err.message : String(err);
+                  setError(e || "Delete failed");
+                } finally {
+                  setIsCreating(false);
+                }
+              }}
+              variant="outline"
+              width="auto"
+              size="md"
+              disabled={isCreating}
+            >
+              Delete
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleClose}
@@ -133,7 +223,7 @@ export default function CreatePlaylistModal({
             size="md"
             disabled={isCreating || !name.trim()}
           >
-            {isCreating ? "Creating..." : "Create"}
+            {isCreating ? (isEdit ? "Saving..." : "Creating...") : (isEdit ? "Save" : "Create")}
           </Button>
         </div>
       </form>

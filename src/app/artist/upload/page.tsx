@@ -4,11 +4,11 @@ import Button from "@/src/app/components/ui/button";
 import { useRouter } from "next/navigation";
 import { createSong, createPlaylist, fetchPlaylistsByAuthor } from "@/src/app/utils/api";
 import { startTusUpload } from "@/src/app/utils/tusClient";
-import { useUserType, useUserId } from "@/src/app/utils/auth";
+import { useUserId, useRouteRedirect } from "@/src/app/utils/auth";
+import CreatePlaylistModal from "@/src/app/components/ui/createPlaylistModal";
 
 export default function UploadPage() {
   const router = useRouter();
-  const userType = useUserType();
   const userId = useUserId();
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
@@ -37,12 +37,8 @@ export default function UploadPage() {
   const [newAlbumDescription, setNewAlbumDescription] = useState("");
   const [creatingAlbum, setCreatingAlbum] = useState(false);
 
-  useEffect(() => {
-    // Only allow artists to access this page
-    if (userType && userType.toLowerCase() !== "author") {
-      router.push("/dashboard");
-    }
-  }, [userType, router]);
+  // Ensure this page is visited under the `/artist` route; otherwise redirect.
+  useRouteRedirect('/artist', '/');
 
   useEffect(() => {
     // Set the current user's ID as the default author ID
@@ -55,22 +51,13 @@ export default function UploadPage() {
   useEffect(() => {
     async function loadPlaylists() {
       if (!userId) return;
-      
       try {
         setLoadingPlaylists(true);
-        console.log('Fetching playlists/albums for userId:', userId);
         const data = await fetchPlaylistsByAuthor(userId);
-        console.log('Raw API response:', data);
-        
         const playlists = data?.data || data || [];
-        console.log('Parsed playlists/albums:', playlists);
-        
-        // For authors, filter to show only albums (isAlbum: true)
-        const filteredPlaylists = userType?.toLowerCase() === 'author' 
-          ? playlists.filter((p: any) => p.isAlbum === true)
-          : playlists;
-        
-        console.log('Filtered playlists/albums:', filteredPlaylists);
+
+        // In the artist area, show only albums (isAlbum: true)
+        const filteredPlaylists = playlists.filter((p: any) => p.isAlbum === true);
         setUserPlaylists(filteredPlaylists);
       } catch (err: any) {
         console.error('Failed to fetch playlists:', err);
@@ -80,72 +67,47 @@ export default function UploadPage() {
     }
 
     loadPlaylists();
-  }, [userId, userType]);
+  }, [userId]);
 
-  // Show loading while checking user type
-  if (!userType) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-400">Loading...</p>
-      </div>
-    );
-  }
+  // Route-based guard handles redirects; no userType checks here anymore.
 
-  // If not an artist, show nothing while redirecting
-  if (userType.toLowerCase() !== "author") {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-400">Access denied. Redirecting...</p>
-      </div>
-    );
-  }
-
-  async function handleCreateAlbum() {
-    if (!newAlbumName.trim()) {
-      setMessage("Please provide an album name.");
-      return;
-    }
-
-    if (!userId) {
-      setMessage("User ID not found.");
+  // Modal confirm handler used by CreatePlaylistModal
+  async function handleModalConfirm(
+    name: string,
+    description: string,
+    ownerIds: string[],
+    picture?: string,
+    isPublic?: boolean
+  ) {
+    if (!name.trim() || !userId) {
+      setMessage("Invalid album data or missing user ID.");
       return;
     }
 
     try {
       setCreatingAlbum(true);
       setMessage("Creating album...");
-      
-      const albumPayload = {
-        name: newAlbumName.trim(),
-        description: newAlbumDescription.trim() || "",
-        picture: "", // Can be added later if needed
-        isPublic: true,
-        isAlbum: true, // Authors create albums
-        ownerIds: [userId], // Current user as owner
+
+      const payload = {
+        name: name.trim(),
+        description: description.trim() || "",
+        picture: picture || "",
+        isPublic: isPublic ?? true,
+        isAlbum: true,
+        ownerIds,
       };
-      
-      console.log("Create album payload:", albumPayload);
-      
-      const newAlbum = await createPlaylist(albumPayload);
-      
-      // Set the newly created album as selected
-      const albumId = newAlbum?.id || newAlbum?.data?.id;
+
+      const created = await createPlaylist(payload);
+      const albumId = created?.id || created?.data?.id;
+      const albumData = created?.data || created;
       if (albumId) {
         setSelectedAlbumId(albumId);
         setAlbum(albumId);
-        
-        // Add to the list of playlists
-        const albumData = newAlbum?.data || newAlbum;
-        setUserPlaylists([...userPlaylists, albumData]);
-        
+        setUserPlaylists((prev) => [albumData, ...prev]);
         setMessage("Album created successfully!");
       } else {
         setMessage("Album created but ID not returned");
       }
-      
-      setShowCreateAlbum(false);
-      setNewAlbumName("");
-      setNewAlbumDescription("");
     } catch (err: any) {
       console.error("Failed to create album:", err);
       setMessage(`Failed to create album: ${err?.message || err}`);
@@ -403,43 +365,13 @@ export default function UploadPage() {
           </>
         )}
 
-        {/* Create Album Form */}
-        {showCreateAlbum && (
-          <div className="mt-4 p-4 border border-neutral-700 rounded bg-neutral-800">
-            <h4 className="font-semibold mb-3">Create New Album</h4>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Album Name *</label>
-                <input
-                  type="text"
-                  value={newAlbumName}
-                  onChange={(e) => setNewAlbumName(e.target.value)}
-                  className="w-full rounded-md p-2 bg-neutral-900 border border-neutral-700"
-                  placeholder="My New Album"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Album Description</label>
-                <textarea
-                  value={newAlbumDescription}
-                  onChange={(e) => setNewAlbumDescription(e.target.value)}
-                  className="w-full rounded-md p-2 bg-neutral-900 border border-neutral-700"
-                  rows={2}
-                  placeholder="Optional description"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="default"
-                onClick={handleCreateAlbum}
-                disabled={creatingAlbum}
-              >
-                {creatingAlbum ? 'Creating...' : 'Create Album'}
-              </Button>
-            </div>
-          </div>
-        )}
+        <CreatePlaylistModal
+          isOpen={showCreateAlbum}
+          onClose={() => setShowCreateAlbum(false)}
+          onConfirm={handleModalConfirm}
+          isAlbum={true}
+          userId={userId}
+        />
 
         {selectedAlbumId && (
           <p className="text-sm text-green-400 mt-3">

@@ -6,7 +6,8 @@ import Link from '@/src/app/components/ui/link'
 import Image from 'next/image'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { isAuthValid } from '@/src/app/utils/auth'
+import { isAuthValid, getUserType } from '@/src/app/utils/auth'
+import { fetchUserInfo } from '@/src/app/utils/api'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,7 +18,18 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthValid()) {
-      router.push('/dashboard')
+      const checkUserType = async () => {
+        const type = await getUserType();
+        const typeStr = type ? String(type).toLowerCase() : null;
+        if (typeStr && (typeStr === 'author' || typeStr === 'artist')) {
+          router.push('/artist/dashboard')
+        } else if (typeStr === 'user') {
+          router.push('/user/dashboard')
+        } else {
+          //router.push('/auth/login')
+        }
+      }
+      checkUserType();
     }
   }, [router])
 
@@ -35,27 +47,63 @@ export default function LoginPage() {
         credentials: 'include',
       });
 
-      const responseData = await response.json();
-      console.log(responseData);
-      
+      let responseData: any = null;
+      try {
+        responseData = await response.json();
+      } catch (err) {
+        console.error('Login response not JSON', err);
+      }
+      console.debug('Login response:', response.status, response.statusText, responseData);
+
       if (!response.ok) {
-        localStorage.removeItem('expiresAt');
-        localStorage.removeItem('accessToken');
-        throw new Error(responseData?.error.message || 'Login failed');
+        try { localStorage.removeItem('expiresAt'); localStorage.removeItem('accessToken'); } catch {}
+        const remoteMsg = responseData?.error?.message || responseData?.message || JSON.stringify(responseData || {});
+        throw new Error(remoteMsg || `Login failed: ${response.status} ${response.statusText}`);
       }
 
-      if (responseData && responseData.data) {
-        try {
-          localStorage.setItem('expiresAt', responseData.data.expiresAt);
-          localStorage.setItem('accessToken', responseData.data.accessToken);
-        } catch (err) {
-          console.warn('Could not save accessToken to localStorage', err);
+      // Try several common field names for tokens/expiry to be resilient to API shape
+      const token = responseData?.data?.accessToken || responseData?.data?.AccessToken || responseData?.accessToken || responseData?.AccessToken || null;
+      const expires = responseData?.data?.expiresAt || responseData?.data?.expires_at || responseData?.data?.ExpiresAt || responseData?.expiresAt || responseData?.expires_at || null;
+
+      if (!token) {
+        console.warn('Login succeeded but no access token found in response', responseData);
+        throw new Error('Login succeeded but server did not return an access token');
+      }
+
+      try {
+        if (expires) localStorage.setItem('expiresAt', String(expires));
+        localStorage.setItem('accessToken', String(token));
+      } catch (err) {
+        console.warn('Could not save accessToken to localStorage', err);
+      }
+
+      // First, try the server-side /auth/me to get authoritative role
+      try {
+        const me = await fetchUserInfo();
+        // Role might be numeric (0 or 1) or string; prefer numeric mapping if present
+        const rawRole = me?.role ?? me?.userType ?? me?.data?.role ?? me?.data?.userType ?? null;
+        const num = rawRole != null ? Number(rawRole) : NaN;
+        if (!Number.isNaN(num)) {
+          if (num === 1) {
+            router.push('/artist/dashboard');
+            return;
+          } else {
+            router.push('/user/dashboard');
+            return;
+          }
         }
-      } else {
-        console.warn('No accessToken returned from login endpoint', responseData);
+      } catch (err) {
+        console.debug('fetchUserInfo failed during post-login redirect', err);
       }
 
-      router.push('/dashboard');
+      const type = await getUserType();
+      let typeStr = type ? String(type).toLowerCase() : null;
+
+      if (typeStr && (typeStr === 'author' || typeStr === 'artist')) {
+        router.push('/artist/dashboard')
+      } else {
+        router.push('/user/dashboard')
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import * as signalR from '@microsoft/signalr';
+import { EmojiReaction, ReactionResponse } from '@/src/app/types/emojiReaction';
 
 type PlaybackState = {
   currentSongId: string | null;
@@ -24,6 +25,10 @@ type SignalRContextType = {
   connection: signalR.HubConnection | null;
   isConnected: boolean;
   playbackState: PlaybackState | null;
+  currentPlaylistId: string | null;
+  currentPlaylistSongs: string[];
+  setCurrentPlaylistId: (id: string | null) => void;
+  setCurrentPlaylistSongs: (songs: string[]) => void;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   joinPlaylist: (playlistId: string) => Promise<void>;
@@ -35,12 +40,19 @@ type SignalRContextType = {
   activateState: (state: PlaybackState) => Promise<void>;
   setPlaylistSongs: (songIds: string[]) => void;
   setPlayerControls: (controls: PlayerControls | null) => void;
+  // Reactions
+  sendReaction: (reaction: EmojiReaction, songId?: string | null) => Promise<void>;
+  setOnReactionListener: (listener: ((r: ReactionResponse) => void) | null) => void;
 };
 
 const SignalRContext = createContext<SignalRContextType>({
   connection: null,
   isConnected: false,
   playbackState: null,
+  currentPlaylistId: null,
+  currentPlaylistSongs: [],
+  setCurrentPlaylistId: () => {},
+  setCurrentPlaylistSongs: () => {},
   connect: async () => {},
   disconnect: async () => {},
   joinPlaylist: async () => {},
@@ -52,6 +64,9 @@ const SignalRContext = createContext<SignalRContextType>({
   activateState: async () => {},
   setPlaylistSongs: () => {},
   setPlayerControls: () => {},
+  // Reactions defaults
+  sendReaction: async () => {},
+  setOnReactionListener: () => {},
 });
 
 export const useSignalR = () => useContext(SignalRContext);
@@ -62,9 +77,11 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   const [playbackState, setPlaybackState] = useState<PlaybackState | null>(null);
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   const [currentPlaylistSongs, setCurrentPlaylistSongs] = useState<string[]>([]);
+  
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const playlistSongsRef = useRef<string[]>([]);
   const playerControlsRef = useRef<PlayerControls | null>(null);
+  const reactionListenerRef = useRef<((r: ReactionResponse) => void) | null>(null);
 
   const connect = async () => {
     console.log('Attempting to connect to SignalR...', { isConnected, connectionExists: !!connectionRef.current });
@@ -89,6 +106,7 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
           console.log('Providing token for SignalR connection:', currentToken ? 'Token found' : 'No token');
           return currentToken || '';
         },
+        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling,
       })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Information)
@@ -101,6 +119,18 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
     newConnection.on('PlaybackState', (state: PlaybackState) => {
       console.log('Received PlaybackState:', state);
       activateState(state);
+    });
+
+    // Listen for emoji reactions from server
+    newConnection.on('ReceiveReaction', (reaction: ReactionResponse) => {
+      try {
+        console.log('Received Reaction:', reaction);
+        if (reactionListenerRef.current) {
+          reactionListenerRef.current(reaction);
+        }
+      } catch (err) {
+        console.error('Error handling ReceiveReaction:', err);
+      }
     });
 
     // Handle reconnection events
@@ -127,6 +157,26 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(true);
     } catch (err: any) {
       console.error('❌ SignalR Connection Error:', err);
+      // If WebSockets failed, try long polling as a fallback
+      try {
+        console.log('Attempting LongPolling fallback for SignalR...');
+        const fallbackConnection = new signalR.HubConnectionBuilder()
+          .withUrl(hubUrl, {
+            accessTokenFactory: () => localStorage.getItem('accessToken') || '',
+            transport: signalR.HttpTransportType.LongPolling,
+          })
+          .withAutomaticReconnect()
+          .configureLogging(signalR.LogLevel.Information)
+          .build();
+
+        connectionRef.current = fallbackConnection;
+        setConnection(fallbackConnection);
+        await fallbackConnection.start();
+        console.log('✅ SignalR Connected with LongPolling fallback');
+        setIsConnected(true);
+      } catch (fallbackErr) {
+        console.error('LongPolling fallback failed:', fallbackErr);
+      }
       const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'http://localhost:5039';
       console.error('Error details:', {
         message: err.message,
@@ -189,14 +239,33 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
       await currentConnection.invoke('LeavePlaylist');
       console.log('Left playlist');
       setPlaybackState(null);
-      setCurrentPlaylistId(null);
-      setCurrentPlaylistSongs([]);
       playlistSongsRef.current = [];
+      setCurrentPlaylistId(null);
+      try {
+        localStorage.removeItem('currentPlaylistId');
+      } catch (err) {
+        console.warn('Could not remove stored playlist id:', err);
+      }
     } catch (err) {
       console.error('Error leaving playlist:', err);
       throw err;
     }
   };
+
+  // Persist current playlist id to localStorage so a page refresh can restore it
+  useEffect(() => {
+    try {
+      if (currentPlaylistId) {
+        localStorage.setItem('currentPlaylistId', currentPlaylistId);
+      } else {
+        localStorage.removeItem('currentPlaylistId');
+      }
+    } catch (err) {
+      console.warn('Could not persist current playlist id:', err);
+    }
+  }, [currentPlaylistId]);
+
+  // Note: auto-join on reconnect was removed so pages control joining explicitly.
 
   const playSong = async (songId: string | null) => {
     const currentConnection = connectionRef.current;
@@ -259,6 +328,24 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
     console.log('Playlist songs updated:', songIds.length, 'songs', playlistSongsRef.current);
   };
 
+  const sendReaction = async (reaction: EmojiReaction, songId?: string | null) => {
+    const currentConnection = connectionRef.current;
+    if (!currentConnection || currentConnection.state !== signalR.HubConnectionState.Connected) {
+      throw new Error('SignalR connection not established');
+    }
+    try {
+      // Server expects SendReaction(EmojiReaction reaction)
+      await currentConnection.invoke('SendReaction', reaction);
+    } catch (err) {
+      console.error('Error sending reaction:', err);
+      throw err;
+    }
+  };
+
+  const setOnReactionListener = (listener: ((r: ReactionResponse) => void) | null) => {
+    reactionListenerRef.current = listener;
+  };
+
   const setPlayerControls = (controls: PlayerControls | null) => {
     playerControlsRef.current = controls;
     console.log('Player controls set:', controls ? 'Controls available' : 'Controls cleared');
@@ -270,6 +357,10 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
         connection,
         isConnected,
         playbackState,
+        currentPlaylistId,
+        currentPlaylistSongs,
+        setCurrentPlaylistId,
+        setCurrentPlaylistSongs,
         connect,
         disconnect,
         joinPlaylist,
@@ -281,6 +372,8 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
         activateState,
         setPlaylistSongs,
         setPlayerControls,
+          sendReaction,
+          setOnReactionListener,
       }}
     >
       {children}

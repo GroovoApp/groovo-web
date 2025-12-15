@@ -3,6 +3,8 @@ import { Sora } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+import { FallingEmojisProvider } from '@/src/app/contexts/FallingEmojisContext';
 
 const sora = Sora({
   variable: "--font-sora",
@@ -38,7 +40,10 @@ export default function RootLayout({
       <body
         className={`${sora.variable} ${geistMono.variable} ${display.variable} antialiased`}
       >
-        {children}
+        <FallingEmojisProvider>
+          {children}
+          <Toaster richColors/>
+        </FallingEmojisProvider>
       </body>
     </html>
   );
