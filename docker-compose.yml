@@ -1,0 +1,13 @@
+services:
+  groovo-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
+        - NEXT_PUBLIC_CONTENT_BASE=${NEXT_PUBLIC_CONTENT_BASE}
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+    restart: unless-stopped
