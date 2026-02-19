@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Groovo Web
 
-## Getting Started
+## Start-up instructions
 
-First, run the development server:
-
+This project uses Docker to run the application. To start the application, follow these steps. Make sure you have Docker installed on your machine.
+1. Clone the repository and navigate to the project directory.
+2. Run the following command to build and start the application:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d --build
 ```
 
-Open [http://localhost:8080](http://localhost:8080) with your browser to see the result.
+## Deployment pipeline
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The deployment pipeline is set up using GitHub Actions. Whenever changes are pushed to the main branch, the pipeline will automatically build and deploy the application to the production environment.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Following script is executed inside the machine:
+```bash
+cd /home/github_deploy/groovo
+git fetch --all
+git reset --hard origin/main
 
-## Learn More
+docker --version
+docker compose --version
 
-To learn more about Next.js, take a look at the following resources:
+docker compose up -d --build
+echo "Deployment completed successfully."
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## ENV variables
 
-## Deploy on Vercel
+```env
+# Docker configuration
+PORT=5011
+NODE_ENV=production
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Application configuration
+NEXT_PUBLIC_API_BASE=https://groovo.venderes.com/server #(Your API endpoint that responds to API calls)
+NEXT_PUBLIC_CONTENT_BASE=https://groovo.venderes.com/server #(Your content endpoint that serves content)
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Technologies Used
+- Node.js as the server for the web page
+- Next.js as the framework for UI 
+- Docker for containerization
+- GitHub Actions for CI/CD

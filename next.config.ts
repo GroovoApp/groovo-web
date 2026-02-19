@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
-const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://groovo.venderes.com';
-const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'https://groovo.venderes.com';
+const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'localhost';
+const contentBase = process.env.NEXT_PUBLIC_CONTENT_BASE || 'localhost';
 
 const getRemotePatterns = () => {
   const patterns = [
